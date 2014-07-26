@@ -124,6 +124,7 @@ class FlowToolBridge(FlowTool):
 
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
+        FlowBoardPainter.drawBridge(QPainter(img), img.rect())
         return img
 
 

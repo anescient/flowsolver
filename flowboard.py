@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from PyQt4.QtCore import Qt
+from PyQt4.QtCore import Qt, QRect
 from PyQt4.QtGui import QPainter, QImage, QColor, QPen
 
 
@@ -40,6 +40,7 @@ class FlowBoardPainter(object):
 
     bgcolor = QColor(0, 0, 0)
     gridcolor = QColor(81, 80, 62)
+    flowwidth = 0.4
 
     def __init__(self, grid):
         self._grid = grid
@@ -65,10 +66,30 @@ class FlowBoardPainter(object):
         QPainter(self._img).fillRect(r, self._highlightcolor)
 
     @staticmethod
-    def drawEndpoint(painter, rect, key):
-        painter.save()
-        painter.setRenderHint(QPainter.Antialiasing, True)
-        painter.setBrush(FlowPalette[key])
-        painter.setPen(QPen(Qt.NoPen))
-        painter.drawEllipse(rect)
-        painter.restore()
+    def drawEndpoint(ptr, rect, key):
+        ptr.save()
+        ptr.setRenderHint(QPainter.Antialiasing, True)
+        ptr.setBrush(FlowPalette[key])
+        ptr.setPen(QPen(Qt.NoPen))
+        ptr.drawEllipse(rect)
+        ptr.restore()
+
+    @staticmethod
+    def drawBridge(ptr, rect):
+        w = rect.width() * FlowBoardPainter.flowwidth
+        FlowBoardPainter._fillCorners(ptr, rect, w, \
+            FlowBoardPainter.gridcolor)
+        FlowBoardPainter._fillCorners(ptr, rect, w - 3, \
+            FlowBoardPainter.bgcolor)
+
+    @staticmethod
+    def _fillCorners(ptr, rect, width, color):
+        corner = QRect(0, 0, width, width)
+        corner.moveTopLeft(rect.topLeft())
+        ptr.fillRect(corner, color)
+        corner.moveTopRight(rect.topRight())
+        ptr.fillRect(corner, color)
+        corner.moveBottomLeft(rect.bottomLeft())
+        ptr.fillRect(corner, color)
+        corner.moveBottomRight(rect.bottomRight())
+        ptr.fillRect(corner, color)
