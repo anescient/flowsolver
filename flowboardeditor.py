@@ -2,7 +2,7 @@
 
 from PyQt4.QtCore import Qt, QPoint, QSize, pyqtSignal, pyqtSlot
 from PyQt4.QtGui import QPainter, QWidget, QToolBar, QComboBox, QButtonGroup, \
-    QCheckBox, QGridLayout, QSizePolicy, QColor, QPen
+    QCheckBox, QGridLayout, QSizePolicy, QColor, QPen, QImage
 from grid import SpacedGrid
 from flowboard import FlowBoard, FlowPalette, FlowBoardPainter
 
@@ -65,23 +65,84 @@ class FlowBoardEditor(QWidget):
         self.newBoard(size)
 
 
-class SwatchToggle(QCheckBox):
-    def __init__(self, color, key=None):
-        super(SwatchToggle, self).__init__()
-        self.setSizePolicy(QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed))
-        self._size = 30
-        self._color = color
+############################ cell tools
+
+
+class FlowTool(object):
+    def __init__(self):
+        self._icon = None
+
+    def getIcon(self, size):
+        if not self._icon or self._icon.size() != size:
+            self._icon = self._makeIcon(size)
+        return self._icon
+
+    def _makeIcon(self, size):
+        raise NotImplementedError()
+
+
+class FlowToolClear(FlowTool):
+    def __init__(self):
+        super(FlowToolClear, self).__init__()
+
+    def _makeIcon(self, size):
+        img = QImage(size, QImage.Format_ARGB32_Premultiplied)
+        ptr = QPainter(img)
+        ptr.setCompositionMode(QPainter.CompositionMode_Clear)
+        ptr.fillRect(img.rect(), QColor(0, 0, 0, 0))
+        return img
+
+
+class FlowToolEndpoint(FlowTool):
+    def __init__(self, key, color):
+        super(FlowToolEndpoint, self).__init__()
         self._key = key
+        self._color = color
 
     @property
-    def key(self):
+    def endpointKey(self):
         return self._key
 
-    def setSelected(self, on):
-        self.setCheckState(Qt.Checked if on else Qt.Unchecked)
+    @property
+    def color(self):
+        return self._color
+
+    def _makeIcon(self, size):
+        img = QImage(size, QImage.Format_ARGB32_Premultiplied)
+        ptr = QPainter(img)
+        ptr.setCompositionMode(QPainter.CompositionMode_Clear)
+        ptr.fillRect(img.rect(), QColor(0, 0, 0, 0))
+        ptr.setCompositionMode(QPainter.CompositionMode_SourceOver)
+        ptr.setRenderHint(QPainter.Antialiasing, True)
+        ptr.setBrush(self.color)
+        ptr.setPen(QPen(Qt.NoPen))
+        ptr.drawEllipse(img.rect())
+        return img
+
+
+############################ toolbar
+
+
+class FlowToolButton(QCheckBox):
+    def __init__(self, tool):
+        super(FlowToolButton, self).__init__()
+        self.setSizePolicy(QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed))
+        self._size = 30
+        assert isinstance(tool, FlowTool)
+        self._tool = tool
+
+    @property
+    def tool(self):
+        return self._tool
+
+    def setSelected(self, selected):
+        self.setCheckState(Qt.Checked if selected else Qt.Unchecked)
 
     def hitButton(self, pos):
         return self.rect().contains(pos)
+
+    def sizeHint(self):
+        return QSize(self._size, self._size)
 
     def paintEvent(self, event):
         ptr = QPainter(self)
@@ -89,21 +150,16 @@ class SwatchToggle(QCheckBox):
         if self.checkState() == Qt.Checked:
             ptr.setPen(QPen(QColor(255, 255, 255), 2, Qt.DotLine))
             ptr.drawRect(self.rect().adjusted(1, 1, -1, -1))
-        ptr.setRenderHint(QPainter.Antialiasing, True)
-        ptr.setBrush(self._color)
-        ptr.setPen(QPen(Qt.NoPen))
-        ptr.drawEllipse(self.rect().adjusted(2, 2, -2, -2))
-
-    def sizeHint(self):
-        return QSize(self._size, self._size)
+        iconrect = self.rect().adjusted(2, 2, -2, -2)
+        ptr.drawImage(iconrect.topLeft(), self._tool.getIcon(iconrect.size()))
 
 
-class FlowColorChooser(QWidget):
-    def __init__(self, palette):
-        super(FlowColorChooser, self).__init__()
-        self._palette = palette
-        self._keys = sorted(self._palette.keys())
-        self._keyButtons = {}
+class FlowToolChooser(QWidget):
+    def __init__(self):
+        super(FlowToolChooser, self).__init__()
+        self._endpointTools = [FlowToolEndpoint(k, FlowPalette[k]) for k in \
+            sorted(FlowPalette.keys())]
+        self._endpointButtons = []
         self._group = QButtonGroup()
         self._group.setExclusive(True)
         layout = QGridLayout()
@@ -111,31 +167,24 @@ class FlowColorChooser(QWidget):
         layout.setMargin(0)
         row = 0
         col = 0
-        for k in self._keys:
-            b = SwatchToggle(self._palette[k], k)
-            self._keyButtons[k] = b
+        for tool in self._endpointTools:
+            b = FlowToolButton(tool)
+            self._endpointButtons.append(b)
             self._group.addButton(b)
             layout.addWidget(b, row, col)
             col += 1
-            if col >= len(self._keys) / 2:
+            if col >= len(self._endpointTools) / 2:
                 row += 1
                 col = 0
         self.setLayout(layout)
-        self.setSelectedKey(self._keys[0])
+        self._endpointButtons[0].setSelected(True)
 
-    def selectedKey(self):
-        return self._group.checkedButton().key
+    def selectedTool(self):
+        return self._group.checkedButton().tool
 
-    def selected(self):
-        k = self.selectedKey()
-        return (k, self._palette[k])
-
-    def setSelectedKey(self, key):
-        self._keyButtons[key].setSelected(True)
-
-    def selectNext(self):
-        nextidx = (self._keys.index(self.selectedKey) + 1) % len(self._keys)
-        self.setSelectedKey(self._keys[nextidx])
+    #def selectNext(self):
+        #nextidx = (self._keys.index(self.selectedKey) + 1) % len(self._keys)
+        #self.setSelectedKey(self._keys[nextidx])
 
 
 class FlowBoardEditorToolBar(QToolBar):
@@ -155,8 +204,8 @@ class FlowBoardEditorToolBar(QToolBar):
         act_clear.triggered.connect(self._clearClicked)
 
         self.addSeparator()
-        self._colorpicker = FlowColorChooser(FlowPalette)
-        self.addWidget(self._colorpicker)
+        self._toolchooser = FlowToolChooser()
+        self.addWidget(self._toolchooser)
 
     @property
     def selectedSize(self):
