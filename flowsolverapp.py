@@ -2,7 +2,7 @@
 
 from PyQt4.QtGui import QApplication, QMainWindow, QColor
 from QSquareWidget import QSquareWidgetContainer
-from flowboardeditor import FlowBoardEditor, FlowBoardEditorToolBar
+from flowboardeditor import FlowBoardEditor
 
 
 class FlowSolverWindow(QMainWindow):
@@ -10,24 +10,20 @@ class FlowSolverWindow(QMainWindow):
         super(FlowSolverWindow, self).__init__()
         self.setWindowTitle("flow solver")
 
-        etb = FlowBoardEditorToolBar()
-        etb.setFloatable(False)
-        etb.setMovable(False)
-        self.addToolBar(etb)
-
-        tb = self.addToolBar("toobar")
-        tb.setFloatable(False)
-        tb.setMovable(False)
-        tb.addAction("solve")
-
-        editor = FlowBoardEditor(etb.selectedSize)
-        editor.connectToolbar(etb)
-
+        editor = FlowBoardEditor()
+        editor.toolbar.setFloatable(False)
+        editor.toolbar.setMovable(False)
+        self.addToolBar(editor.toolbar)
         editorcontainer = QSquareWidgetContainer()
         editorcontainer.setMargin(20)
         editorcontainer.setWidget(editor)
         editorcontainer.setBackgroundColor(QColor(0, 0, 0))
         self.setCentralWidget(editorcontainer)
+
+        tb = self.addToolBar("toobar")
+        tb.setFloatable(False)
+        tb.setMovable(False)
+        tb.addAction("solve")
 
 
 if __name__ == '__main__':

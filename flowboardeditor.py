@@ -8,23 +8,25 @@ from flowboard import FlowBoard, FlowPalette, FlowBoardPainter
 
 
 class FlowBoardEditor(QWidget):
-    def __init__(self, boardSize):
+    def __init__(self):
         super(FlowBoardEditor, self).__init__()
         self.setMinimumSize(400, 400)
         self.setMouseTracking(True)
+        self._toolbar = FlowBoardEditorToolBar()
+        self._connectToolbar(self._toolbar)
         self._board = None
         self._grid = None
         self._markedCell = None
-        self.newBoard(boardSize)
+        self.newBoard(self._toolbar.selectedSize)
+
+    @property
+    def toolbar(self):
+        return self._toolbar
 
     def newBoard(self, boardSize):
         self._board = FlowBoard(boardSize)
         self._updateGrid()
         self.repaint()
-
-    def connectToolbar(self, tb):
-        assert isinstance(tb, FlowBoardEditorToolBar)
-        tb.makeNewBoard.connect(self._makeNewBoard)
 
     def resizeEvent(self, event):
         super(FlowBoardEditor, self).resizeEvent(event)
@@ -54,6 +56,9 @@ class FlowBoardEditor(QWidget):
         if self._markedCell:
             ptr.drawCellHighlight(self._markedCell)
         return ptr.image
+
+    def _connectToolbar(self, toolbar):
+        toolbar.makeNewBoard.connect(self._makeNewBoard)
 
     @pyqtSlot(int)
     def _makeNewBoard(self, size):
