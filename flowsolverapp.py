@@ -21,6 +21,8 @@ class FlowSolverWindow(QMainWindow):
         tb.addAction("solve")
 
         editor = FlowBoardEditor(etb.selectedSize)
+        editor.connectToolbar(etb)
+
         editorcontainer = QSquareWidgetContainer()
         editorcontainer.setMargin(20)
         editorcontainer.setWidget(editor)

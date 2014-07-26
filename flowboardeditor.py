@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from PyQt4.QtCore import Qt, QPoint, QSize
+from PyQt4.QtCore import Qt, QPoint, QSize, pyqtSignal, pyqtSlot
 from PyQt4.QtGui import QPainter, QWidget, QToolBar, QComboBox, QButtonGroup, \
     QCheckBox, QGridLayout, QSizePolicy, QColor, QPen
 from grid import SpacedGrid
@@ -20,6 +20,11 @@ class FlowBoardEditor(QWidget):
     def newBoard(self, boardSize):
         self._board = FlowBoard(boardSize)
         self._updateGrid()
+        self.repaint()
+
+    def connectToolbar(self, tb):
+        assert isinstance(tb, FlowBoardEditorToolBar)
+        tb.makeNewBoard.connect(self._makeNewBoard)
 
     def resizeEvent(self, event):
         super(FlowBoardEditor, self).resizeEvent(event)
@@ -49,6 +54,10 @@ class FlowBoardEditor(QWidget):
         if self._markedCell:
             ptr.drawCellHighlight(self._markedCell)
         return ptr.image
+
+    @pyqtSlot(int)
+    def _makeNewBoard(self, size):
+        self.newBoard(size)
 
 
 class SwatchToggle(QCheckBox):
@@ -125,6 +134,9 @@ class FlowColorChooser(QWidget):
 
 
 class FlowBoardEditorToolBar(QToolBar):
+
+    makeNewBoard = pyqtSignal(int)  # argument: board size
+
     def __init__(self):
         super(FlowBoardEditorToolBar, self).__init__()
 
@@ -132,8 +144,10 @@ class FlowBoardEditorToolBar(QToolBar):
         for s in xrange(5, 15):
             self._sizelist.addItem("{0}x{0}".format(s), s)
         self.addWidget(self._sizelist)
+        self._sizelist.currentIndexChanged.connect(self._sizelistChanged)
 
-        self.addAction("clear")
+        act_clear = self.addAction("clear")
+        act_clear.triggered.connect(self._clearClicked)
 
         self.addSeparator()
         self._colorpicker = FlowColorChooser(FlowPalette)
@@ -143,3 +157,11 @@ class FlowBoardEditorToolBar(QToolBar):
     def selectedSize(self):
         qv = self._sizelist.itemData(self._sizelist.currentIndex())
         return qv.toInt()[0]
+
+    @pyqtSlot(int)
+    def _sizelistChanged(self, _):
+        self.makeNewBoard.emit(self.selectedSize)
+
+    @pyqtSlot(bool)
+    def _clearClicked(self, _):
+        self.makeNewBoard.emit(self.selectedSize)
