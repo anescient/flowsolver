@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
-from PyQt4.QtCore import QPoint
-from PyQt4.QtGui import QWidget, QToolBar, QComboBox, QPainter
+from PyQt4.QtCore import Qt, QPoint, QSize
+from PyQt4.QtGui import QPainter, QWidget, QToolBar, QComboBox, QButtonGroup, \
+    QCheckBox, QGridLayout, QSizePolicy, QColor, QPen
 from grid import SpacedGrid
-from flowboard import FlowBoard, FlowBoardPainter
+from flowboard import FlowBoard, FlowPalette, FlowBoardPainter
 
 
 class FlowBoardEditor(QWidget):
@@ -50,12 +51,95 @@ class FlowBoardEditor(QWidget):
         return ptr.image
 
 
+class SwatchToggle(QCheckBox):
+    def __init__(self, color, key=None):
+        super(SwatchToggle, self).__init__()
+        self.setSizePolicy(QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed))
+        self._size = 30
+        self._color = color
+        self._key = key
+
+    @property
+    def key(self):
+        return self._key
+
+    def setSelected(self, on):
+        self.setCheckState(Qt.Checked if on else Qt.Unchecked)
+
+    def hitButton(self, pos):
+        return self.rect().contains(pos)
+
+    def paintEvent(self, event):
+        ptr = QPainter(self)
+        ptr.fillRect(self.rect(), QColor(0, 0, 0))
+        if self.checkState() == Qt.Checked:
+            ptr.setPen(QPen(QColor(255, 255, 255), 2, Qt.DotLine))
+            ptr.drawRect(self.rect().adjusted(1, 1, -1, -1))
+        ptr.setRenderHint(QPainter.Antialiasing, True)
+        ptr.setBrush(self._color)
+        ptr.setPen(QPen(Qt.NoPen))
+        ptr.drawEllipse(self.rect().adjusted(2, 2, -2, -2))
+
+    def sizeHint(self):
+        return QSize(self._size, self._size)
+
+
+class FlowColorChooser(QWidget):
+    def __init__(self, palette):
+        super(FlowColorChooser, self).__init__()
+        self._palette = palette
+        self._keys = sorted(self._palette.keys())
+        self._keyButtons = {}
+        self._group = QButtonGroup()
+        self._group.setExclusive(True)
+        layout = QGridLayout()
+        layout.setSpacing(0)
+        layout.setMargin(0)
+        row = 0
+        col = 0
+        for k in self._keys:
+            b = SwatchToggle(self._palette[k], k)
+            self._keyButtons[k] = b
+            self._group.addButton(b)
+            layout.addWidget(b, row, col)
+            col += 1
+            if col >= len(self._keys) / 2:
+                row += 1
+                col = 0
+        self.setLayout(layout)
+        self.setSelectedKey(self._keys[0])
+
+    def selectedKey(self):
+        return self._group.checkedButton().key
+
+    def selected(self):
+        k = self.selectedKey()
+        return (k, self._palette[k])
+
+    def setSelectedKey(self, key):
+        self._keyButtons[key].setSelected(True)
+
+    def selectNext(self):
+        nextidx = (self._keys.index(self.selectedKey) + 1) % len(self._keys)
+        self.setSelectedKey(self._keys[nextidx])
+
+
 class FlowBoardEditorToolBar(QToolBar):
     def __init__(self):
         super(FlowBoardEditorToolBar, self).__init__()
-        cb = QComboBox()
-        cb.addItem("7x7", 7)
-        cb.addItem("8x8", 8)
-        cb.addItem("9x9", 9)
-        self.addWidget(cb)
+
+        self._sizelist = QComboBox()
+        for s in xrange(5, 15):
+            self._sizelist.addItem("{0}x{0}".format(s), s)
+        self.addWidget(self._sizelist)
+
         self.addAction("clear")
+
+        self.addSeparator()
+        self._colorpicker = FlowColorChooser(FlowPalette)
+        self.addWidget(self._colorpicker)
+
+    @property
+    def selectedSize(self):
+        qv = self._sizelist.itemData(self._sizelist.currentIndex())
+        return qv.toInt()[0]
