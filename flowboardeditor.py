@@ -36,6 +36,10 @@ class FlowBoardEditor(QWidget):
         super(FlowBoardEditor, self).paintEvent(event)
         QPainter(self).drawImage(QPoint(0, 0), self._renderBoard())
 
+    def mousePressEvent(self, event):
+        super(FlowBoardEditor, self).mousePressEvent(event)
+        self._toolbar.selectNextEndpointTool()
+
     def mouseMoveEvent(self, event):
         super(FlowBoardEditor, self).mouseMoveEvent(event)
         self._markCell(self._grid.findCell(event.pos()))
@@ -80,12 +84,8 @@ class FlowTool(object):
     def _makeIcon(self, size):
         raise NotImplementedError()
 
-
-class FlowToolClear(FlowTool):
-    def __init__(self):
-        super(FlowToolClear, self).__init__()
-
-    def _makeIcon(self, size):
+    @staticmethod
+    def _emptyIcon(size):
         img = QImage(size, QImage.Format_ARGB32_Premultiplied)
         ptr = QPainter(img)
         ptr.setCompositionMode(QPainter.CompositionMode_Clear)
@@ -93,30 +93,37 @@ class FlowToolClear(FlowTool):
         return img
 
 
+class FlowToolClear(FlowTool):
+    def __init__(self):
+        super(FlowToolClear, self).__init__()
+
+    def _makeIcon(self, size):
+        img = FlowTool._emptyIcon(size)
+        return img
+
+
 class FlowToolEndpoint(FlowTool):
-    def __init__(self, key, color):
+    def __init__(self, key):
         super(FlowToolEndpoint, self).__init__()
         self._key = key
-        self._color = color
 
     @property
     def endpointKey(self):
         return self._key
 
-    @property
-    def color(self):
-        return self._color
+    def _makeIcon(self, size):
+        img = FlowTool._emptyIcon(size)
+        ptr = QPainter(img)
+        FlowBoardPainter.drawEndpoint(ptr, img.rect(), self.endpointKey)
+        return img
+
+
+class FlowToolBridge(FlowTool):
+    def __init__(self):
+        super(FlowToolBridge, self).__init__()
 
     def _makeIcon(self, size):
-        img = QImage(size, QImage.Format_ARGB32_Premultiplied)
-        ptr = QPainter(img)
-        ptr.setCompositionMode(QPainter.CompositionMode_Clear)
-        ptr.fillRect(img.rect(), QColor(0, 0, 0, 0))
-        ptr.setCompositionMode(QPainter.CompositionMode_SourceOver)
-        ptr.setRenderHint(QPainter.Antialiasing, True)
-        ptr.setBrush(self.color)
-        ptr.setPen(QPen(Qt.NoPen))
-        ptr.drawEllipse(img.rect())
+        img = FlowTool._emptyIcon(size)
         return img
 
 
@@ -146,7 +153,7 @@ class FlowToolButton(QCheckBox):
 
     def paintEvent(self, event):
         ptr = QPainter(self)
-        ptr.fillRect(self.rect(), QColor(0, 0, 0))
+        ptr.fillRect(self.rect(), FlowBoardPainter.bgcolor)
         if self.checkState() == Qt.Checked:
             ptr.setPen(QPen(QColor(255, 255, 255), 2, Qt.DotLine))
             ptr.drawRect(self.rect().adjusted(1, 1, -1, -1))
@@ -157,8 +164,8 @@ class FlowToolButton(QCheckBox):
 class FlowToolChooser(QWidget):
     def __init__(self):
         super(FlowToolChooser, self).__init__()
-        self._endpointTools = [FlowToolEndpoint(k, FlowPalette[k]) for k in \
-            sorted(FlowPalette.keys())]
+        self._endpointTools = \
+            [FlowToolEndpoint(k) for k in sorted(FlowPalette.keys())]
         self._endpointButtons = []
         self._group = QButtonGroup()
         self._group.setExclusive(True)
@@ -166,25 +173,37 @@ class FlowToolChooser(QWidget):
         layout.setSpacing(0)
         layout.setMargin(0)
         row = 0
-        col = 0
+        col = 1
         for tool in self._endpointTools:
             b = FlowToolButton(tool)
             self._endpointButtons.append(b)
             self._group.addButton(b)
             layout.addWidget(b, row, col)
             col += 1
-            if col >= len(self._endpointTools) / 2:
+            if col > len(self._endpointTools) / 2:
                 row += 1
-                col = 0
+                col = 1
+
+        b = FlowToolButton(FlowToolClear())
+        self._group.addButton(b)
+        layout.addWidget(b, 0, 0)
+
+        b = FlowToolButton(FlowToolBridge())
+        self._group.addButton(b)
+        layout.addWidget(b, 1, 0)
+
         self.setLayout(layout)
         self._endpointButtons[0].setSelected(True)
 
     def selectedTool(self):
         return self._group.checkedButton().tool
 
-    #def selectNext(self):
-        #nextidx = (self._keys.index(self.selectedKey) + 1) % len(self._keys)
-        #self.setSelectedKey(self._keys[nextidx])
+    def selectNextEndpointTool(self):
+        b = self._group.checkedButton()
+        if isinstance(b.tool, FlowToolEndpoint):
+            i = self._endpointButtons.index(b)
+            if i < len(self._endpointButtons) - 1:
+                self._endpointButtons[i + 1].setSelected(True)
 
 
 class FlowBoardEditorToolBar(QToolBar):
@@ -211,6 +230,9 @@ class FlowBoardEditorToolBar(QToolBar):
     def selectedSize(self):
         qv = self._sizelist.itemData(self._sizelist.currentIndex())
         return qv.toInt()[0]
+
+    def selectNextEndpointTool(self):
+        self._toolchooser.selectNextEndpointTool()
 
     @pyqtSlot(int)
     def _sizelistChanged(self, _):

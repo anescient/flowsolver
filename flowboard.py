@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from PyQt4.QtCore import Qt
 from PyQt4.QtGui import QPainter, QImage, QColor, QPen
 
 
@@ -36,13 +37,15 @@ FlowPalette = {
 
 
 class FlowBoardPainter(object):
+
+    bgcolor = QColor(0, 0, 0)
+    gridcolor = QColor(81, 80, 62)
+
     def __init__(self, grid):
         self._grid = grid
         self._img = QImage(self._grid.size, QImage.Format_ARGB32_Premultiplied)
-        self._bgcolor = QColor(0, 0, 0)
-        self._gridcolor = QColor(81, 80, 62)
         self._highlightcolor = QColor(34, 51, 44)
-        QPainter(self._img).fillRect(self._img.rect(), self._bgcolor)
+        QPainter(self._img).fillRect(self._img.rect(), self.bgcolor)
 
     @property
     def image(self):
@@ -50,7 +53,7 @@ class FlowBoardPainter(object):
 
     def drawGrid(self):
         ptr = QPainter(self._img)
-        ptr.setPen(QPen(self._gridcolor, self._grid.spacing))
+        ptr.setPen(QPen(self.gridcolor, self._grid.spacing))
         w = self._img.width()
         for x in self._grid.columnSpacingsCenters():
             ptr.drawLine(x, 0, x, w)
@@ -60,3 +63,12 @@ class FlowBoardPainter(object):
     def drawCellHighlight(self, cell):
         r = self._grid.cellRect(cell)
         QPainter(self._img).fillRect(r, self._highlightcolor)
+
+    @staticmethod
+    def drawEndpoint(painter, rect, key):
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setBrush(FlowPalette[key])
+        painter.setPen(QPen(Qt.NoPen))
+        painter.drawEllipse(rect)
+        painter.restore()
