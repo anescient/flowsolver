@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from copy import deepcopy
 from PyQt4.QtCore import Qt, QPoint, QSize, pyqtSignal, pyqtSlot
 from PyQt4.QtGui import QPainter, QWidget, QToolBar, QComboBox, QButtonGroup, \
     QPushButton, QCheckBox, QGridLayout, QBoxLayout, QSizePolicy, \
@@ -28,6 +29,9 @@ class FlowBoardEditor(QWidget):
         self._board = FlowBoard(boardSize)
         self._updateGrid()
         self.repaint()
+
+    def getBoard(self):
+        return deepcopy(self._board)
 
     def resizeEvent(self, event):
         super(FlowBoardEditor, self).resizeEvent(event)
@@ -68,13 +72,13 @@ class FlowBoardEditor(QWidget):
             self._board.size, self._board.size, self.rect().size(), 2)
 
     def _renderBoard(self):
-        ptr = FlowBoardPainter(self._grid)
-        ptr.drawGrid()
+        fbp = FlowBoardPainter(self._grid)
+        fbp.drawGrid()
         if self._markedCell:
-            ptr.drawCellHighlight(self._markedCell)
-        ptr.drawEndpoints(self._board.endpoints)
-        ptr.drawBridges(self._board.bridges)
-        return ptr.image
+            fbp.drawCellHighlight(self._markedCell)
+        fbp.drawEndpoints(self._board.endpoints)
+        fbp.drawBridges(self._board.bridges)
+        return fbp.image
 
     def _connectToolbar(self, toolbar):
         toolbar.makeNewBoard.connect(self._makeNewBoard)

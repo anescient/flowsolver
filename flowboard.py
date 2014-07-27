@@ -25,6 +25,20 @@ class FlowBoard(object):
         for cell in self._bridges:
             yield cell
 
+    def isValid(self):
+        keys = self._endpoints.keys()
+        if not keys:
+            return False
+        if not all(self.hasCompleteEndpoints(k) for k in keys):
+            return False
+        if not all(self.isInnerCell(cell) for cell in self._bridges):
+            return False
+        return True
+
+    def isInnerCell(self, cell):
+        return cell[0] > 0 and cell[0] < self._size - 1 and \
+               cell[1] > 0 and cell[1] < self._size - 1
+
     def hasCompleteEndpoints(self, key):
         return key in self._endpoints and len(self._endpoints[key]) == 2
 
