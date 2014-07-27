@@ -2,7 +2,8 @@
 
 from PyQt4.QtCore import Qt, QPoint, QSize, pyqtSignal, pyqtSlot
 from PyQt4.QtGui import QPainter, QWidget, QToolBar, QComboBox, QButtonGroup, \
-    QCheckBox, QGridLayout, QSizePolicy, QColor, QPen, QImage
+    QPushButton, QCheckBox, QGridLayout, QBoxLayout, QSizePolicy, \
+    QColor, QPen, QImage
 from grid import SpacedGrid
 from flowboard import FlowBoard, FlowPalette, FlowBoardPainter
 
@@ -119,6 +120,9 @@ class FlowToolClear(FlowTool):
 
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
+        ptr = QPainter(img)
+        ptr.setPen(QPen(FlowBoardPainter.gridcolor, 2, join=Qt.MiterJoin))
+        ptr.drawRect(img.rect().adjusted(1, 1, -1, -1))
         return img
 
 
@@ -198,7 +202,8 @@ class FlowToolChooser(QWidget):
         self._group.setExclusive(True)
         layout = QGridLayout()
         layout.setSpacing(0)
-        layout.setMargin(0)
+        layout.setMargin(4)
+        layout.setAlignment(Qt.AlignCenter)
         row = 0
         col = 1
         for tool in self._endpointTools:
@@ -227,6 +232,10 @@ class FlowToolChooser(QWidget):
         b = self._group.checkedButton()
         return b.tool if b else None
 
+    def paintEvent(self, event):
+        QPainter(self).fillRect(self.rect(), FlowBoardPainter.bgcolor)
+        super(FlowToolChooser, self).paintEvent(event)
+
     def selectNextEndpointTool(self):
         b = self._group.checkedButton()
         if isinstance(b.tool, FlowToolEndpoint):
@@ -242,16 +251,23 @@ class FlowBoardEditorToolBar(QToolBar):
     def __init__(self):
         super(FlowBoardEditorToolBar, self).__init__()
 
+        boardbox = QBoxLayout(QBoxLayout.TopToBottom)
+        boardbox.setSpacing(2)
+
         self._sizelist = QComboBox()
         for s in xrange(5, 15):
             self._sizelist.addItem("{0}x{0}".format(s), s)
-        self.addWidget(self._sizelist)
+        boardbox.addWidget(self._sizelist)
         self._sizelist.currentIndexChanged.connect(self._sizelistChanged)
 
-        act_clear = self.addAction("clear")
-        act_clear.triggered.connect(self._clearClicked)
+        clearbutton = QPushButton("clear")
+        boardbox.addWidget(clearbutton)
+        clearbutton.clicked.connect(self._clearClicked)
 
-        self.addSeparator()
+        boardboxwidget = QWidget()
+        boardboxwidget.setLayout(boardbox)
+        self.addWidget(boardboxwidget)
+
         self._toolchooser = FlowToolChooser()
         self.addWidget(self._toolchooser)
 
