@@ -7,10 +7,50 @@ from PyQt4.QtGui import QPainter, QImage, QColor, QPen
 class FlowBoard(object):
     def __init__(self, size=None):
         self._size = size or 7
+        self._endpoints = {}  # key: list (length 1 or 2) of 2-tuples
+        self._bridges = set()  # 2-tuples
 
     @property
     def size(self):
         return self._size
+
+    @property
+    def endpoints(self):
+        for k, l in self._endpoints.iteritems():
+            for cell in l:
+                yield (cell, k)
+
+    @property
+    def bridges(self):
+        for cell in self._bridges:
+            yield cell
+
+    def hasCompleteEndpoints(self, key):
+        return key in self._endpoints and len(self._endpoints[key]) == 2
+
+    def setEndpoint(self, cell, key):
+        self.clear(cell)
+        l = self._endpoints[key] if key in self._endpoints else []
+        l.append(cell)
+        if len(l) > 2:
+            l.pop(0)
+            assert len(l) == 2
+        self._endpoints[key] = l
+
+    def setBridge(self, cell):
+        self.clear(cell)
+        self._bridges.add(cell)
+
+    def clear(self, cell):
+        assert self._includesCell(cell)
+        for k, l in self._endpoints.iteritems():
+            if cell in l:
+                if len(l) == 1:
+                    del self._endpoints[k]
+                else:
+                    l.remove(cell)
+                break
+        self._bridges.discard(cell)
 
     def _includesCell(self, cell):
         return cell[0] >= 0 and cell[0] < self._size and \
@@ -60,6 +100,19 @@ class FlowBoardPainter(object):
             ptr.drawLine(x, 0, x, w)
         for y in self._grid.rowSpacingsCenters():
             ptr.drawLine(0, y, w, y)
+
+    def drawEndpoints(self, endpoints):
+        ptr = QPainter(self._img)
+        for cell, key in endpoints:
+            rect = self._grid.cellRect(cell)
+            margin = rect.width() // 8
+            rect = rect.adjusted(margin, margin, -margin, -margin)
+            FlowBoardPainter.drawEndpoint(ptr, rect, key)
+
+    def drawBridges(self, bridges):
+        ptr = QPainter(self._img)
+        for cell in bridges:
+            FlowBoardPainter.drawBridge(ptr, self._grid.cellRect(cell))
 
     def drawCellHighlight(self, cell):
         r = self._grid.cellRect(cell)

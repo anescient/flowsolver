@@ -37,12 +37,24 @@ class FlowBoardEditor(QWidget):
         QPainter(self).drawImage(QPoint(0, 0), self._renderBoard())
 
     def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            cell = self._grid.findCell(event.pos())
+            if cell:
+                self._cellClicked(cell)
+                return
         super(FlowBoardEditor, self).mousePressEvent(event)
-        self._toolbar.selectNextEndpointTool()
 
     def mouseMoveEvent(self, event):
         super(FlowBoardEditor, self).mouseMoveEvent(event)
         self._markCell(self._grid.findCell(event.pos()))
+
+    def _cellClicked(self, cell):
+        tool = self._toolbar.selectedTool
+        tool.applyAction(self._board, cell)
+        if isinstance(tool, FlowToolEndpoint):
+            if self._board.hasCompleteEndpoints(tool.endpointKey):
+                self._toolbar.selectNextEndpointTool()
+        self.repaint()
 
     def _markCell(self, cell):
         if self._markedCell == cell:
@@ -59,6 +71,8 @@ class FlowBoardEditor(QWidget):
         ptr.drawGrid()
         if self._markedCell:
             ptr.drawCellHighlight(self._markedCell)
+        ptr.drawEndpoints(self._board.endpoints)
+        ptr.drawBridges(self._board.bridges)
         return ptr.image
 
     def _connectToolbar(self, toolbar):
@@ -81,6 +95,9 @@ class FlowTool(object):
             self._icon = self._makeIcon(size)
         return self._icon
 
+    def applyAction(self, board, cell):
+        raise NotImplementedError()
+
     def _makeIcon(self, size):
         raise NotImplementedError()
 
@@ -97,6 +114,9 @@ class FlowToolClear(FlowTool):
     def __init__(self):
         super(FlowToolClear, self).__init__()
 
+    def applyAction(self, board, cell):
+        board.clear(cell)
+
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
         return img
@@ -111,6 +131,9 @@ class FlowToolEndpoint(FlowTool):
     def endpointKey(self):
         return self._key
 
+    def applyAction(self, board, cell):
+        board.setEndpoint(cell, self.endpointKey)
+
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
         ptr = QPainter(img)
@@ -121,6 +144,9 @@ class FlowToolEndpoint(FlowTool):
 class FlowToolBridge(FlowTool):
     def __init__(self):
         super(FlowToolBridge, self).__init__()
+
+    def applyAction(self, board, cell):
+        board.setBridge(cell)
 
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
@@ -196,8 +222,10 @@ class FlowToolChooser(QWidget):
         self.setLayout(layout)
         self._endpointButtons[0].setSelected(True)
 
+    @property
     def selectedTool(self):
-        return self._group.checkedButton().tool
+        b = self._group.checkedButton()
+        return b.tool if b else None
 
     def selectNextEndpointTool(self):
         b = self._group.checkedButton()
@@ -231,6 +259,10 @@ class FlowBoardEditorToolBar(QToolBar):
     def selectedSize(self):
         qv = self._sizelist.itemData(self._sizelist.currentIndex())
         return qv.toInt()[0]
+
+    @property
+    def selectedTool(self):
+        return self._toolchooser.selectedTool
 
     def selectNextEndpointTool(self):
         self._toolchooser.selectNextEndpointTool()
