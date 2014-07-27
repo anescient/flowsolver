@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from PyQt4.QtCore import Qt, QRect
+from PyQt4.QtCore import Qt, QLine, QRect
 from PyQt4.QtGui import QPainter, QImage, QColor, QPen
 
 
@@ -19,6 +19,12 @@ class FlowBoard(object):
         for k, l in self._endpoints.iteritems():
             for cell in l:
                 yield (cell, k)
+
+    @property
+    def endpointPairs(self):
+        for k, l in self._endpoints.iteritems():
+            if len(l) == 2:
+                yield (k, l[0], l[1])
 
     @property
     def bridges(self):
@@ -133,6 +139,24 @@ class FlowBoardPainter(object):
         r = self._grid.cellRect(cell)
         QPainter(self._img).fillRect(r, self._highlightcolor)
 
+    def drawFlow(self, key, cells):
+        assert len(cells) > 1
+        ptr = QPainter(self._img)
+        linew = int(\
+            self._grid.cellRect(cells[0]).width() * FlowBoardPainter.flowwidth)
+        ptr.setPen(QPen(FlowPalette[key], linew, \
+            cap=Qt.RoundCap, join=Qt.RoundJoin))
+        ptr.drawLines(self._flowLines(cells))
+
+    def _flowLines(self, cells):
+        assert len(cells) > 1
+        cells = FlowBoardPainter._simplifyFlow(cells)
+        lines = []
+        for start, end in zip(cells[:-1], cells[1:]):
+            lines.append(QLine(self._grid.cellCenter(start), \
+                               self._grid.cellCenter(end)))
+        return lines
+
     @staticmethod
     def drawEndpoint(ptr, rect, key):
         ptr.save()
@@ -149,6 +173,20 @@ class FlowBoardPainter(object):
             FlowBoardPainter.gridcolor)
         FlowBoardPainter._fillCorners(ptr, rect, w - 3, \
             FlowBoardPainter.bgcolor)
+
+    @staticmethod
+    def _simplifyFlow(cells):
+        if len(cells) < 3:
+            return cells
+        simple = cells[:2]
+        for cell in cells[2:]:
+            a, b, c = simple[-2], simple[-1], cell
+            colinear = (a[0] == b[0] and b[0] == c[0]) or \
+                       (a[1] == b[1] and b[1] == c[1])
+            if colinear:
+                simple.pop()
+            simple.append(cell)
+        return simple
 
     @staticmethod
     def _fillCorners(ptr, rect, width, color):

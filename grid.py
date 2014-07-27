@@ -43,6 +43,9 @@ class SpacedGrid(object):
         r = self._rows[cell[1]]
         return QRect(QPoint(c[0], r[0]), QPoint(c[1], r[1]))
 
+    def cellCenter(self, cell):
+        return self.cellRect(cell).center()
+
     def findCell(self, point):
         ci = SpacedGrid._searchRanges(self._columns, point.x())
         if ci is None:
