@@ -52,6 +52,7 @@ class FlowBoard(object):
         self._endpoints[key] = l
 
     def setBridge(self, cell):
+        assert self.isInnerCell(cell)
         self.clear(cell)
         self._bridges.add(cell)
 

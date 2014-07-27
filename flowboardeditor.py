@@ -25,6 +25,10 @@ class FlowBoardEditor(QWidget):
     def toolbar(self):
         return self._toolbar
 
+    @property
+    def selectedTool(self):
+        return self._toolbar.selectedTool
+
     def newBoard(self, boardSize):
         self._board = FlowBoard(boardSize)
         self._updateGrid()
@@ -54,11 +58,12 @@ class FlowBoardEditor(QWidget):
         self._markCell(self._grid.findCell(event.pos()))
 
     def _cellClicked(self, cell):
-        tool = self._toolbar.selectedTool
-        tool.applyAction(self._board, cell)
-        if isinstance(tool, FlowToolEndpoint):
-            if self._board.hasCompleteEndpoints(tool.endpointKey):
-                self._toolbar.selectNextEndpointTool()
+        tool = self.selectedTool
+        if tool.canApply(self._board, cell):
+            tool.applyAction(self._board, cell)
+            if isinstance(tool, FlowToolEndpoint):
+                if self._board.hasCompleteEndpoints(tool.endpointKey):
+                    self.toolbar.selectNextEndpointTool()
         self.repaint()
 
     def _markCell(self, cell):
@@ -75,7 +80,8 @@ class FlowBoardEditor(QWidget):
         fbp = FlowBoardPainter(self._grid)
         fbp.drawGrid()
         if self._markedCell:
-            fbp.drawCellHighlight(self._markedCell)
+            if self.selectedTool.canApply(self._board, self._markedCell):
+                fbp.drawCellHighlight(self._markedCell)
         fbp.drawEndpoints(self._board.endpoints)
         fbp.drawBridges(self._board.bridges)
         return fbp.image
@@ -99,6 +105,9 @@ class FlowTool(object):
         if not self._icon or self._icon.size() != size:
             self._icon = self._makeIcon(size)
         return self._icon
+
+    def canApply(self, board, cell):
+        return True
 
     def applyAction(self, board, cell):
         raise NotImplementedError()
@@ -152,6 +161,9 @@ class FlowToolEndpoint(FlowTool):
 class FlowToolBridge(FlowTool):
     def __init__(self):
         super(FlowToolBridge, self).__init__()
+
+    def canApply(self, board, cell):
+        return board.isInnerCell(cell)
 
     def applyAction(self, board, cell):
         board.setBridge(cell)
