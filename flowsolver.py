@@ -48,6 +48,62 @@ class FlowGraphSolver(object):
             return not self._freeverts and \
                    all(v1 == v2 for v1, v2 in self._vertexpairs)
 
+        def heuristicUnsolvable(self):
+            """
+                Returns True if this state cannot lead to a solution,
+                False if this state _might_ lead to a solution.
+            """
+            if not self._connectableAndCovered():
+                return True
+            if self._hasDeadEnd():
+                return True
+            return False
+
+        def _connectableAndCovered(self):
+            """
+                Returns True iff all pairs can be connected and
+                all open vertices can be reached.
+            """
+            components = self._graph.disjointPartitions(self._freeverts)
+            covered = set()
+            for v1, v2 in self._vertexpairs:
+                if v1 == v2:
+                    continue
+                acis1 = self._adjacentComponentIndices(components, v1)
+                acis2 = self._adjacentComponentIndices(components, v2)
+                commonacis = acis1.intersection(acis2)
+                if not commonacis and not self._graph.adjacent(v1, v2):
+                    return False
+                covered |= commonacis
+            return len(covered) == len(components)
+
+        def _adjacentComponentIndices(self, components, v):
+            acis = set()
+            adj = self._graph.adjacencies(v)
+            for ci, component in enumerate(components):
+                if component.intersection(adj):
+                    acis.add(ci)
+            return acis
+
+        def _hasDeadEnd(self):
+            """
+                Returns True iff any open vertex is adjacent only to
+                one other open vertex or path head.
+            """
+            heads = set()
+            for v1, v2 in self._vertexpairs:
+                if v1 != v2:
+                    heads.add(v1)
+                    heads.add(v2)
+            active = heads.union(self._freeverts)
+            for ov in self._freeverts:
+                adj = self._graph.adjacencies(ov)
+                x = len(adj.intersection(active))
+                assert x > 0
+                if x == 1:
+                    return True
+            return False
+
         def takeNextFrame(self):
             return next(self._framegen, None)
 
@@ -120,9 +176,13 @@ class FlowGraphSolver(object):
 
     def run(self):
         while self._stack:
-            if self._stack[-1].isSolved():
+            top = self._stack[-1]
+            if top.isSolved():
                 break
-            nextframe = self._stack[-1].takeNextFrame()
+            if top.heuristicUnsolvable():
+                self._stack.pop()
+                break
+            nextframe = top.takeNextFrame()
             if nextframe:
                 self._stack.append(nextframe)
             else:

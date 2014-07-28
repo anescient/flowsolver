@@ -32,6 +32,10 @@ class SimpleGraph(object):
         self._edges[v1].add(v2)
         self._edges[v2].add(v1)
 
+    def adjacent(self, v1, v2):
+        """Return True iff v1 and v2 share an edge."""
+        return v2 in self._edges[v1]
+
     def adjacencies(self, v):
         """Return set of vertices adjacent to v. Never includes v."""
         return self._edges[v]

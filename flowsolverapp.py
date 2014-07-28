@@ -75,7 +75,7 @@ class FlowSolvingPopup(QDialog):
             self._solverWidget.setBoard(board)
             self._setMessage("running")
             self._startTime = datetime.now()
-            self._timer.start(50)
+            self._timer.start(20)
         else:
             self._setMessage("board is not valid")
 
