@@ -14,10 +14,10 @@ class FlowBoardSolver(object):
                                     self._gridgraph.singleVertexAt(xy1), \
                                     self._gridgraph.singleVertexAt(xy2)))
         self._solver = FlowGraphSolver(self._gridgraph.getGraphCopy(), \
-            ((v1, v2) for _, v1, v2 in self._endpoints))
+            [(v1, v2) for _, v1, v2 in self._endpoints])
 
-    def run(self, steps=None):
-        self._solver.run(steps)
+    def run(self):
+        self._solver.run()
 
     def getFlows(self):
         for vflow in self._solver.getFlows():
@@ -110,35 +110,24 @@ class FlowGraphSolver(object):
             return paths
 
     def __init__(self, graph, vertexpairs):
-        self._graph = graph
-        self._vertexpairs = list(vertexpairs)
-        assert all(len(vp) == 2 for vp in self._vertexpairs)
-        assert len(reduce(set.union, map(set, self._vertexpairs), set())) == \
-               2 * len(self._vertexpairs)
-        self._flows = None
+        assert all(len(vp) == 2 for vp in vertexpairs)
+        assert len(reduce(set.union, map(set, vertexpairs), set())) == \
+               2 * len(vertexpairs)
+        freeverts = set(graph.vertices)
+        freeverts -= set(v for vp in vertexpairs for v in vp)
+        self._stack = [FlowGraphSolver.Frame(\
+            graph, list(vertexpairs), freeverts)]
 
-    def run(self, steps=None):
-        freeverts = set(self._graph.vertices)
-        for vp in self._vertexpairs:
-            for v in vp:
-                freeverts.remove(v)
-        stack = [FlowGraphSolver.Frame(\
-            self._graph, list(self._vertexpairs), freeverts)]
-        while stack:
-            if steps is not None:
-                if steps < 1:
-                    break
-                steps -= 1
-
-            if stack[-1].isSolved():
+    def run(self):
+        while self._stack:
+            if self._stack[-1].isSolved():
                 break
-            nextframe = stack[-1].takeNextFrame()
+            nextframe = self._stack[-1].takeNextFrame()
             if nextframe:
-                stack.append(nextframe)
+                self._stack.append(nextframe)
             else:
-                stack.pop()
-        self._flows = FlowGraphSolver.Frame.recoverPaths(stack)
-        self._flows = [f for f in self._flows if len(f) > 1]
+                self._stack.pop()
+                break
 
     def getFlows(self):
-        return self._flows or []
+        return FlowGraphSolver.Frame.recoverPaths(self._stack)

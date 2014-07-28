@@ -70,14 +70,11 @@ class FlowSolvingPopup(QDialog):
         self._timer.timeout.connect(self._timerTick)
         self._startTime = None
 
-        self._steps = None
-
     def runSolve(self, board):
         if board.isValid():
             self._solverWidget.setBoard(board)
             self._setMessage("running")
             self._startTime = datetime.now()
-            self._steps = 0
             self._timer.start(50)
         else:
             self._setMessage("board is not valid")
@@ -105,9 +102,7 @@ class FlowSolvingPopup(QDialog):
     @pyqtSlot()
     def _timerTick(self):
         self._setTimerMessage()
-        self._steps += 1
-        print "run {0} steps".format(self._steps)
-        self._solverWidget.run(self._steps)
+        self._solverWidget.run()
 
 
 if __name__ == '__main__':

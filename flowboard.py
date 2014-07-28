@@ -140,7 +140,8 @@ class FlowBoardPainter(object):
         QPainter(self._img).fillRect(r, self._highlightcolor)
 
     def drawFlow(self, key, cells):
-        assert len(cells) > 1
+        if len(cells) < 2:
+            return
         ptr = QPainter(self._img)
         linew = int(\
             self._grid.cellRect(cells[0]).width() * FlowBoardPainter.flowwidth)

@@ -27,8 +27,8 @@ class FlowSolverWidget(QWidget):
                 self._board.size, self._board.size, self.rect().size(), 2)
             self._solver = FlowBoardSolver(self._board)
 
-    def run(self, steps):
-        self._solver.run(steps)
+    def run(self):
+        self._solver.run()
         self.repaint()
 
     def paintEvent(self, event):
