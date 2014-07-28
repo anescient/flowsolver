@@ -4,7 +4,7 @@ from PyQt4.QtCore import QPoint, QSize
 from PyQt4.QtGui import QPainter, QWidget
 from flowboard import FlowBoardPainter
 from grid import SpacedGrid
-from flowsolver import FlowSolver
+from flowsolver import FlowBoardSolver
 
 
 class FlowSolverWidget(QWidget):
@@ -15,7 +15,11 @@ class FlowSolverWidget(QWidget):
         self._board = board
         self._grid = SpacedGrid(\
             self._board.size, self._board.size, self.rect().size(), 2)
-        self._solver = FlowSolver(self._board)
+        self._solver = FlowBoardSolver(self._board)
+
+    def run(self, steps):
+        self._solver.run(steps)
+        self.repaint()
 
     def paintEvent(self, event):
         super(FlowSolverWidget, self).paintEvent(event)

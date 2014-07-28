@@ -50,7 +50,9 @@ class FlowSolvingPopup(QDialog):
         layout = QBoxLayout(QBoxLayout.TopToBottom)
         layout.setSpacing(0)
         layout.setMargin(0)
-        layout.addWidget(FlowSolverWidget(self._board))
+
+        self._solverWidget = FlowSolverWidget(self._board)
+        layout.addWidget(self._solverWidget)
 
         status = QStatusBar()
         status.setSizeGripEnabled(False)
@@ -70,15 +72,18 @@ class FlowSolvingPopup(QDialog):
         self._timer.timeout.connect(self._timerTick)
         self._startTime = None
 
+        self._steps = 0
+
     def runSolve(self):
         if self._board.isValid():
             self._setMessage("running")
             self._startTime = datetime.now()
-            self._timer.start(300)
+            self._timer.start(50)
         else:
             self._setMessage("board is not valid")
 
     def closeEvent(self, event):
+        self._timer.stop()
         super(FlowSolvingPopup, self).closeEvent(event)
 
     def _setMessage(self, msg):
@@ -100,6 +105,9 @@ class FlowSolvingPopup(QDialog):
     @pyqtSlot()
     def _timerTick(self):
         self._setTimerMessage()
+        self._steps += 1
+        print "run {0} steps".format(self._steps)
+        self._solverWidget.run(self._steps)
 
 
 if __name__ == '__main__':
