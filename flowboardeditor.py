@@ -33,6 +33,7 @@ class FlowBoardEditor(QWidget):
         self._board = FlowBoard(boardSize)
         self._updateGrid()
         self._toolbar.selectFirstEndpointTool()
+        self._markedCell = None
         self.repaint()
 
     def getBoard(self):
