@@ -52,23 +52,23 @@ class FlowBoardSolver(object):
 class FlowGraphSolver(object):
 
     class Frame(object):
-        def __init__(self, graph, vertexpairs, freeverts):
+        def __init__(self, graph, headpairs, openverts):
             self._graph = graph
-            self._vertexpairs = vertexpairs
-            self._freeverts = freeverts
+            self._headpairs = headpairs
+            self._openverts = openverts
             self._framegen = self._nextFrames()
 
         @property
-        def vertexPairs(self):
-            return (vp for vp in self._vertexpairs)
+        def headPairs(self):
+            return (hp for hp in self._headpairs)
 
         def isSolved(self):
-            return not self._freeverts and \
-                   all(v1 == v2 for v1, v2 in self._vertexpairs)
+            return not self._openverts and \
+                   all(v1 == v2 for v1, v2 in self._headpairs)
 
         def heuristicUnsolvable(self):
             """
-                Returns True if this state cannot lead to a solution,
+                Return True if this state cannot lead to a solution,
                 False if this state _might_ lead to a solution.
             """
             if not self._connectableAndCovered():
@@ -79,12 +79,12 @@ class FlowGraphSolver(object):
 
         def _connectableAndCovered(self):
             """
-                Returns True iff all pairs can be connected and
+                Return True iff all pairs can be connected and
                 all open vertices can be reached.
             """
-            components = self._graph.disjointPartitions(self._freeverts)
+            components = self._graph.disjointPartitions(self._openverts)
             covered = set()
-            for v1, v2 in self._vertexpairs:
+            for v1, v2 in self._headpairs:
                 if v1 == v2:
                     continue
                 acis1 = self._adjacentComponentIndices(components, v1)
@@ -109,12 +109,12 @@ class FlowGraphSolver(object):
                 one other open vertex or path head.
             """
             heads = set()
-            for v1, v2 in self._vertexpairs:
+            for v1, v2 in self._headpairs:
                 if v1 != v2:
                     heads.add(v1)
                     heads.add(v2)
-            active = heads.union(self._freeverts)
-            for ov in self._freeverts:
+            active = heads.union(self._openverts)
+            for ov in self._openverts:
                 adj = self._graph.adjacencies(ov)
                 x = len(adj.intersection(active))
                 assert x > 0
@@ -128,7 +128,7 @@ class FlowGraphSolver(object):
         def _nextFrames(self):
             bestvidx = None
             bestmoves = None
-            for vidx in xrange(len(self._vertexpairs) * 2):
+            for vidx in xrange(len(self._headpairs) * 2):
                 moves = self._movesForVertex(vidx)
                 if moves is None:
                     continue
@@ -141,12 +141,12 @@ class FlowGraphSolver(object):
                 return
             pairidx = bestvidx // 2
             subidx = bestvidx % 2
-            nextpairs = list(self._vertexpairs)
+            nextpairs = list(self._headpairs)
             oldpair = nextpairs[pairidx]
             for m in bestmoves:
                 newpair = (m, oldpair[1]) if subidx == 0 else (oldpair[0], m)
                 nextpairs[pairidx] = newpair
-                nextfree = set(self._freeverts)
+                nextfree = set(self._openverts)
                 if newpair[0] != newpair[1]:
                     nextfree.remove(m)
                 yield FlowGraphSolver.Frame(self._graph, nextpairs, nextfree)
@@ -154,12 +154,12 @@ class FlowGraphSolver(object):
         def _movesForVertex(self, vidx):
             pairidx = vidx // 2
             subidx = vidx % 2
-            v = self._vertexpairs[pairidx][subidx]
-            vother = self._vertexpairs[pairidx][1 - subidx]
+            v = self._headpairs[pairidx][subidx]
+            vother = self._headpairs[pairidx][1 - subidx]
             if v == vother:
                 return None
             adj = self._graph.adjacencies(v)
-            moves = adj.intersection(self._freeverts)
+            moves = adj.intersection(self._openverts)
             if vother in adj:
                 moves.add(vother)
             return moves
@@ -168,9 +168,9 @@ class FlowGraphSolver(object):
         def recoverPaths(framestack):
             if not framestack:
                 return []
-            pathpairs = [([v1], [v2]) for v1, v2 in framestack[0].vertexPairs]
+            pathpairs = [([v1], [v2]) for v1, v2 in framestack[0].headPairs]
             for frame in framestack[1:]:
-                for vp, pathpair in zip(frame.vertexPairs, pathpairs):
+                for vp, pathpair in zip(frame.headPairs, pathpairs):
                     for v, path in zip(vp, pathpair):
                         if path[-1] != v:
                             path.append(v)
@@ -183,14 +183,14 @@ class FlowGraphSolver(object):
                     paths.append(p2)
             return paths
 
-    def __init__(self, graph, vertexpairs):
-        assert all(len(vp) == 2 for vp in vertexpairs)
-        assert len(reduce(set.union, map(set, vertexpairs), set())) == \
-               2 * len(vertexpairs)
-        freeverts = set(graph.vertices)
-        freeverts -= set(v for vp in vertexpairs for v in vp)
+    def __init__(self, graph, headpairs):
+        assert all(len(vp) == 2 for vp in headpairs)
+        assert len(reduce(set.union, map(set, headpairs), set())) == \
+               2 * len(headpairs)
+        openverts = set(graph.vertices)
+        openverts -= set(v for hp in headpairs for v in hp)
         self._stack = [FlowGraphSolver.Frame(\
-            graph, list(vertexpairs), freeverts)]
+            graph, list(headpairs), openverts)]
         self._done = False
 
     @property
