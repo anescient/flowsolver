@@ -152,10 +152,9 @@ class FlowGraphSolver(object):
                 yield FlowGraphSolver.Frame(self._graph, nextpairs, nextfree)
 
         def _movesForVertex(self, vidx):
-            pairidx = vidx // 2
+            hp = self._headpairs[vidx // 2]
             subidx = vidx % 2
-            v = self._headpairs[pairidx][subidx]
-            vother = self._headpairs[pairidx][1 - subidx]
+            v, vother = hp[subidx], hp[1 - subidx]
             if v == vother:
                 return None
             adj = self._graph.adjacencies(v)
@@ -202,13 +201,12 @@ class FlowGraphSolver(object):
         while self._stack:
             top = self._stack[-1]
             if top.isSolved():
-                self._done = True
                 break
             if top.heuristicUnsolvable():
                 self._stack.pop()
                 if newtop:
                     newtop = False
-                    break
+                    return
             nextframe = top.takeNextFrame()
             if nextframe:
                 self._stack.append(nextframe)
@@ -217,7 +215,8 @@ class FlowGraphSolver(object):
                 self._stack.pop()
                 if newtop:
                     newtop = False
-                    break
+                    return
+        self._done = True
 
     def getFlows(self):
         return FlowGraphSolver.Frame.recoverPaths(self._stack)
