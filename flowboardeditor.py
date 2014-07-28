@@ -32,6 +32,7 @@ class FlowBoardEditor(QWidget):
     def newBoard(self, boardSize):
         self._board = FlowBoard(boardSize)
         self._updateGrid()
+        self._toolbar.selectFirstEndpointTool()
         self.repaint()
 
     def getBoard(self):
@@ -233,10 +234,12 @@ class FlowToolChooser(QWidget):
                 col = 1
 
         b = FlowToolButton(FlowToolClear())
+        b.setToolTip("clear")
         self._group.addButton(b)
         layout.addWidget(b, 0, 0)
 
         b = FlowToolButton(FlowToolBridge())
+        b.setToolTip("bridge")
         self._group.addButton(b)
         layout.addWidget(b, 1, 0)
 
@@ -251,6 +254,9 @@ class FlowToolChooser(QWidget):
     def paintEvent(self, event):
         QPainter(self).fillRect(self.rect(), FlowBoardPainter.bgcolor)
         super(FlowToolChooser, self).paintEvent(event)
+
+    def selectFirstEndpointTool(self):
+        self._endpointButtons[0].setSelected(True)
 
     def selectNextEndpointTool(self):
         b = self._group.checkedButton()
@@ -296,6 +302,9 @@ class FlowBoardEditorToolBar(QToolBar):
     @property
     def selectedTool(self):
         return self._toolchooser.selectedTool
+
+    def selectFirstEndpointTool(self):
+        self._toolchooser.selectFirstEndpointTool()
 
     def selectNextEndpointTool(self):
         self._toolchooser.selectNextEndpointTool()
