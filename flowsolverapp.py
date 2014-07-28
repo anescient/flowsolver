@@ -86,14 +86,14 @@ class FlowSolvingPopup(QDialog):
     def _setMessage(self, msg):
         self._messageLabel.setText(msg)
 
-    def _setTimerMessage(self):
+    def _getTimerStr(self):
         dt = datetime.now() - self._startTime
         dm = dt.seconds // 60
         ds = dt.seconds - dm * 60
         dh = dm // 60
         dm -= dh * 60
         dh += dt.days * 24
-        self._setMessage("running for {0}:{1:02}:{2:02}".format(dh, dm, ds))
+        return "{0}:{1:02}:{2:02}".format(dh, dm, ds)
 
     @pyqtSlot(bool)
     def _abortClicked(self, _):
@@ -101,8 +101,12 @@ class FlowSolvingPopup(QDialog):
 
     @pyqtSlot()
     def _timerTick(self):
-        self._setTimerMessage()
-        self._solverWidget.run()
+        if self._solverWidget.doneSolving:
+            self._setMessage("finished after " + self._getTimerStr())
+            self._timer.stop()
+        else:
+            self._setMessage("running for " + self._getTimerStr())
+            self._solverWidget.run()
 
 
 if __name__ == '__main__':

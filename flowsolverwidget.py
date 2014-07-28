@@ -16,6 +16,10 @@ class FlowSolverWidget(QWidget):
         self._grid = None
         self._solver = None
 
+    @property
+    def doneSolving(self):
+        return self._solver.done
+
     def setBoard(self, board):
         if board is None:
             self._board = None

@@ -16,6 +16,10 @@ class FlowBoardSolver(object):
         self._solver = FlowGraphSolver(self._gridgraph.getGraphCopy(), \
             [(v1, v2) for _, v1, v2 in self._endpoints])
 
+    @property
+    def done(self):
+        return self._solver.done
+
     def run(self):
         self._solver.run()
 
@@ -173,21 +177,33 @@ class FlowGraphSolver(object):
         freeverts -= set(v for vp in vertexpairs for v in vp)
         self._stack = [FlowGraphSolver.Frame(\
             graph, list(vertexpairs), freeverts)]
+        self._done = False
+
+    @property
+    def done(self):
+        return self._done
 
     def run(self):
+        newtop = False
         while self._stack:
             top = self._stack[-1]
             if top.isSolved():
+                self._done = True
                 break
             if top.heuristicUnsolvable():
                 self._stack.pop()
-                break
+                if newtop:
+                    newtop = False
+                    break
             nextframe = top.takeNextFrame()
             if nextframe:
                 self._stack.append(nextframe)
+                newtop = True
             else:
                 self._stack.pop()
-                break
+                if newtop:
+                    newtop = False
+                    break
 
     def getFlows(self):
         return FlowGraphSolver.Frame.recoverPaths(self._stack)
