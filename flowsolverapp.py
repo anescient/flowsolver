@@ -32,26 +32,24 @@ class FlowSolverAppWindow(QMainWindow):
         solve.clicked.connect(self._solveClicked)
         tb.addWidget(solve)
 
-    def solve(self):
-        popup = FlowSolvingPopup(self, self._editor.getBoard())
-        popup.setModal(True)
-        popup.show()
-        popup.runSolve()
+        self._solvepopup = FlowSolvingPopup(self)
+        self._solvepopup.setModal(True)
 
     @pyqtSlot(bool)
     def _solveClicked(self, _):
-        self.solve()
+        self._solvepopup.show()
+        self._solvepopup.runSolve(self._editor.getBoard())
 
 
 class FlowSolvingPopup(QDialog):
-    def __init__(self, parent, board):
+    def __init__(self, parent=None):
         super(FlowSolvingPopup, self).__init__(parent)
-        self._board = board
+
         layout = QBoxLayout(QBoxLayout.TopToBottom)
         layout.setSpacing(0)
         layout.setMargin(0)
 
-        self._solverWidget = FlowSolverWidget(self._board)
+        self._solverWidget = FlowSolverWidget()
         layout.addWidget(self._solverWidget)
 
         status = QStatusBar()
@@ -72,12 +70,14 @@ class FlowSolvingPopup(QDialog):
         self._timer.timeout.connect(self._timerTick)
         self._startTime = None
 
-        self._steps = 0
+        self._steps = None
 
-    def runSolve(self):
-        if self._board.isValid():
+    def runSolve(self, board):
+        if board.isValid():
+            self._solverWidget.setBoard(board)
             self._setMessage("running")
             self._startTime = datetime.now()
+            self._steps = 0
             self._timer.start(50)
         else:
             self._setMessage("board is not valid")

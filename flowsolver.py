@@ -33,18 +33,22 @@ class FlowBoardSolver(object):
 
 class FlowGraphSolver(object):
 
-    class _Frame(object):
+    class Frame(object):
         def __init__(self, graph, vertexpairs, freeverts):
             self._graph = graph
             self._vertexpairs = vertexpairs
             self._freeverts = freeverts
             self._framegen = self._nextFrames()
 
+        @property
+        def vertexPairs(self):
+            return (vp for vp in self._vertexpairs)
+
         def isSolved(self):
             return not self._freeverts and \
                    all(v1 == v2 for v1, v2 in self._vertexpairs)
 
-        def nextFrame(self):
+        def takeNextFrame(self):
             return next(self._framegen, None)
 
         def _nextFrames(self):
@@ -71,7 +75,7 @@ class FlowGraphSolver(object):
                 nextfree = set(self._freeverts)
                 if newpair[0] != newpair[1]:
                     nextfree.remove(m)
-                yield FlowGraphSolver._Frame(self._graph, nextpairs, nextfree)
+                yield FlowGraphSolver.Frame(self._graph, nextpairs, nextfree)
 
         def _movesForVertex(self, vidx):
             pairidx = vidx // 2
@@ -88,9 +92,11 @@ class FlowGraphSolver(object):
 
         @staticmethod
         def recoverPaths(framestack):
-            pathpairs = [([v1], [v2]) for v1, v2 in framestack[0]._vertexpairs]
+            if not framestack:
+                return []
+            pathpairs = [([v1], [v2]) for v1, v2 in framestack[0].vertexPairs]
             for frame in framestack[1:]:
-                for vp, pathpair in zip(frame._vertexpairs, pathpairs):
+                for vp, pathpair in zip(frame.vertexPairs, pathpairs):
                     for v, path in zip(vp, pathpair):
                         if path[-1] != v:
                             path.append(v)
@@ -116,7 +122,8 @@ class FlowGraphSolver(object):
         for vp in self._vertexpairs:
             for v in vp:
                 freeverts.remove(v)
-        stack = [FlowGraphSolver._Frame(self._graph, list(self._vertexpairs), freeverts)]
+        stack = [FlowGraphSolver.Frame(\
+            self._graph, list(self._vertexpairs), freeverts)]
         while stack:
             if steps is not None:
                 if steps < 1:
@@ -125,12 +132,12 @@ class FlowGraphSolver(object):
 
             if stack[-1].isSolved():
                 break
-            nextframe = stack[-1].nextFrame()
+            nextframe = stack[-1].takeNextFrame()
             if nextframe:
                 stack.append(nextframe)
             else:
                 stack.pop()
-        self._flows = FlowGraphSolver._Frame.recoverPaths(stack) if stack else []
+        self._flows = FlowGraphSolver.Frame.recoverPaths(stack)
         self._flows = [f for f in self._flows if len(f) > 1]
 
     def getFlows(self):
