@@ -66,10 +66,9 @@ class FlowBoard(object):
         assert self._includesCell(cell)
         for k, l in self._endpoints.iteritems():
             if cell in l:
-                if len(l) == 1:
+                l.remove(cell)
+                if not l:
                     del self._endpoints[k]
-                else:
-                    l.remove(cell)
                 break
         self._bridges.discard(cell)
 
@@ -101,7 +100,7 @@ class FlowBoardPainter(object):
 
     bgcolor = QColor(0, 0, 0)
     gridcolor = QColor(81, 80, 62)
-    flowwidth = 0.4
+    flowwidth = 0.3
 
     def __init__(self, grid):
         self._grid = grid
@@ -169,7 +168,7 @@ class FlowBoardPainter(object):
 
     @staticmethod
     def drawBridge(ptr, rect):
-        w = rect.width() * FlowBoardPainter.flowwidth
+        w = rect.width() * (1.0 - FlowBoardPainter.flowwidth) * 0.5
         FlowBoardPainter._fillCorners(ptr, rect, w, \
             FlowBoardPainter.gridcolor)
         FlowBoardPainter._fillCorners(ptr, rect, w - 3, \
