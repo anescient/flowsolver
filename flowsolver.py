@@ -66,7 +66,7 @@ class FlowGraphSolver(object):
         def _connectableAndCovered(self):
             """
                 Return True iff all pairs can be connected and
-                all open vertices can be reached.
+                all open vertices can be reached by some pair.
             """
             components = self._graph.disjointPartitions(self._openverts)
             covered = set()
@@ -177,14 +177,18 @@ class FlowGraphSolver(object):
         self._stack = [FlowGraphSolver.Frame(\
             graph, list(headpairs), openverts)]
         self._done = False
+        self._steps = 0
 
     @property
     def done(self):
         return self._done
 
     def run(self):
+        if self._done:
+            return
         newtop = False
         while self._stack:
+            self._steps += 1
             top = self._stack[-1]
             if top.isSolved():
                 break
@@ -203,6 +207,7 @@ class FlowGraphSolver(object):
                     newtop = False
                     return
         self._done = True
+        print self._steps
 
     def getFlows(self):
         return FlowGraphSolver.Frame.recoverPaths(self._stack)
