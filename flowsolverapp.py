@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from datetime import datetime
-from PyQt4.QtCore import QTimer, pyqtSlot
+from PyQt4.QtCore import Qt, QTimer, pyqtSlot
 from PyQt4.QtGui import QApplication, QMainWindow, QColor, QPushButton, \
-    QDialog, QStatusBar, QLayout, QBoxLayout, QLabel
+    QDialog, QStatusBar, QLayout, QBoxLayout, QLabel, QFileDialog, QMenuBar
 from QSquareWidget import QSquareWidgetContainer
 from flowboardeditor import FlowBoardEditor
 from flowsolverwidget import FlowSolverWidget
@@ -13,6 +13,7 @@ class FlowSolverAppWindow(QMainWindow):
     def __init__(self):
         super(FlowSolverAppWindow, self).__init__()
         self.setWindowTitle("flow solver")
+        self.setAcceptDrops(True)
 
         self._editor = FlowBoardEditor()
         self._editor.toolbar.setFloatable(False)
@@ -32,13 +33,42 @@ class FlowSolverAppWindow(QMainWindow):
         solve.clicked.connect(self._solveClicked)
         tb.addWidget(solve)
 
+        mb = QMenuBar()
+        filemenu = mb.addMenu("File")
+        filemenu.addAction("Open").triggered.connect(self._openClicked)
+        filemenu.addAction("Save As").triggered.connect(self._saveClicked)
+        self.setMenuBar(mb)
+
         self._solvepopup = FlowSolvingPopup(self)
         self._solvepopup.setModal(True)
+
+    def dragEnterEvent(self, event):
+        event.accept()
+
+    def dropEvent(self, event):
+        if event.proposedAction() & (Qt.CopyAction | Qt.MoveAction):
+            if event.mimeData().hasUrls():
+                filepath = event.mimeData().urls()[0].toLocalFile()
+                if filepath:
+                    event.acceptProposedAction()
+                    self._editor.loadBoardFile(filepath)
 
     @pyqtSlot(bool)
     def _solveClicked(self, _):
         self._solvepopup.show()
         self._solvepopup.runSolve(self._editor.getBoard())
+
+    @pyqtSlot(bool)
+    def _openClicked(self, _):
+        filepath = QFileDialog.getOpenFileName(caption="open board")
+        if filepath:
+            self._editor.loadBoardFile(filepath)
+
+    @pyqtSlot(bool)
+    def _saveClicked(self, _):
+        filepath = QFileDialog.getSaveFileName(caption="save board")
+        if filepath:
+            self._editor.saveBoardFile(filepath)
 
 
 class FlowSolvingPopup(QDialog):

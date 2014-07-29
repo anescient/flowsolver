@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import pickle
 from copy import deepcopy
 from PyQt4.QtCore import Qt, QPoint, QSize, pyqtSignal, pyqtSlot
 from PyQt4.QtGui import QPainter, QWidget, QToolBar, QComboBox, QButtonGroup, \
@@ -30,14 +31,26 @@ class FlowBoardEditor(QWidget):
         return self._toolbar.selectedTool
 
     def newBoard(self, boardSize):
-        self._board = FlowBoard(boardSize)
-        self._updateGrid()
+        self.setBoard(FlowBoard(boardSize))
         self._toolbar.selectFirstEndpointTool()
+
+    def setBoard(self, board):
+        self._toolbar.selectSize(board.size)
+        self._board = board
+        self._updateGrid()
         self._markedCell = None
         self.repaint()
 
     def getBoard(self):
         return deepcopy(self._board)
+
+    def loadBoardFile(self, filepath):
+        board = pickle.load(open(filepath, 'rb'))
+        if isinstance(board, FlowBoard):
+            self.setBoard(board)
+
+    def saveBoardFile(self, filepath):
+        pickle.dump(self._board, open(filepath, 'wb'))
 
     def resizeEvent(self, event):
         super(FlowBoardEditor, self).resizeEvent(event)
@@ -299,6 +312,12 @@ class FlowBoardEditorToolBar(QToolBar):
     def selectedSize(self):
         qv = self._sizelist.itemData(self._sizelist.currentIndex())
         return qv.toInt()[0]
+
+    def selectSize(self, size):
+        if size != self.selectedSize:
+            i = self._sizelist.findData(size)
+            if i >= 0:
+                self._sizelist.setCurrentIndex(i)
 
     @property
     def selectedTool(self):
