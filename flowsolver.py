@@ -49,18 +49,19 @@ class FlowGraphSolver(object):
             return (hp for hp in self._headpairs)
 
         def getUnique(self):
-            heads = []
+            values = []
             for v1, v2 in self._headpairs:
                 if v1 == v2:
-                    heads.append(None)
-                    heads.append(None)
+                    values.append(None)
+                    values.append(None)
                 elif v1 < v2:
-                    heads.append(v1)
-                    heads.append(v2)
+                    values.append(v1)
+                    values.append(v2)
                 else:
-                    heads.append(v2)
-                    heads.append(v1)
-            return (tuple(heads), tuple(sorted(self._openverts)))
+                    values.append(v2)
+                    values.append(v1)
+            values.extend(self._openverts)
+            return tuple(values)
 
         def isSolved(self):
             return not self._openverts and \
@@ -190,9 +191,9 @@ class FlowGraphSolver(object):
         openverts -= set(v for hp in headpairs for v in hp)
         self._stack = [FlowGraphSolver.Frame(\
             graph, list(headpairs), openverts)]
-        self._stepcount = 1
+        self._totalframes = 1
         self._done = False
-        self._visited = set()
+        self._memo = set()
 
     @property
     def done(self):
@@ -216,12 +217,12 @@ class FlowGraphSolver(object):
                     return
             nextframe = top.takeNextFrame()
             if nextframe:
-                self._stepcount += 1
+                self._totalframes += 1
                 u = nextframe.getUnique()
-                if u in self._visited:
+                if u in self._memo:
                     self._stack.append(None)
                     continue
-                self._visited.add(u)
+                self._memo.add(u)
                 self._stack.append(nextframe)
                 newtop = True
             else:
@@ -229,8 +230,8 @@ class FlowGraphSolver(object):
                 if newtop:
                     newtop = False
                     return
-        print "{0} steps".format(self._stepcount)
-        print "{0} visited".format(len(self._visited))
+        print "{0} visited".format(self._totalframes)
+        print "{0} memoized".format(len(self._memo))
         self._done = True
 
     def getFlows(self):
