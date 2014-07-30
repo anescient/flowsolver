@@ -54,7 +54,8 @@ class FlowGraphSolver(object):
                 if v1 == v2:
                     values.append(None)
                     values.append(None)
-                elif v1 < v2:
+                elif v1 < v2:  # todo determine whether this actually matters
+                               # i.e. whether both cases are possible
                     values.append(v1)
                     values.append(v2)
                 else:
@@ -205,31 +206,26 @@ class FlowGraphSolver(object):
         newtop = False
         while self._stack:
             top = self._stack[-1]
-            if top is None:
-                self._stack.pop()
-                continue
-            if top.isSolved():
-                break
-            if top.heuristicUnsolvable():
-                self._stack.pop()
-                if newtop:
-                    newtop = False
-                    return
-            nextframe = top.takeNextFrame()
-            if nextframe:
-                self._totalframes += 1
-                u = nextframe.getUnique()
-                if u in self._memo:
-                    self._stack.append(None)
-                    continue
-                self._memo.add(u)
-                self._stack.append(nextframe)
-                newtop = True
-            else:
+            pop = top.heuristicUnsolvable()
+            if not pop:
+                nextframe = top.takeNextFrame()
+                if nextframe:
+                    self._totalframes += 1
+                    u = nextframe.getUnique()
+                    if u in self._memo:
+                        continue
+                    self._memo.add(u)
+                    self._stack.append(nextframe)
+                    if nextframe.isSolved():
+                        break
+                    newtop = True
+                else:
+                    pop = True
+            if pop:
                 self._stack.pop()
                 if newtop:
-                    newtop = False
                     return
+
         print "{0} visited".format(self._totalframes)
         print "{0} memoized".format(len(self._memo))
         self._done = True
