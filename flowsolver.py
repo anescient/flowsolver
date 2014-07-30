@@ -184,24 +184,23 @@ class FlowGraphSolver(object):
                     paths.append(p2)
             return paths
 
-    def __init__(self, graph, headpairs):
-        assert all(len(vp) == 2 for vp in headpairs)
-        assert len(reduce(set.union, map(set, headpairs), set())) == \
-               2 * len(headpairs)
+    def __init__(self, graph, endpointpairs):
+        assert all(len(vp) == 2 for vp in endpointpairs)
+        assert len(reduce(set.union, map(set, endpointpairs), set())) == \
+               2 * len(endpointpairs)
         openverts = set(graph.vertices)
-        openverts -= set(v for hp in headpairs for v in hp)
+        openverts -= set(v for vp in endpointpairs for v in vp)
         self._stack = [FlowGraphSolver.Frame(\
-            graph, list(headpairs), openverts)]
+            graph, list(endpointpairs), openverts)]
         self._totalframes = 1
-        self._done = False
         self._memo = set()
 
     @property
     def done(self):
-        return self._done
+        return not self._stack or self._stack[-1].isSolved()
 
     def run(self):
-        if self._done:
+        if self.done:
             return
         newtop = False
         while self._stack:
@@ -228,7 +227,6 @@ class FlowGraphSolver(object):
 
         print "{0} visited".format(self._totalframes)
         print "{0} memoized".format(len(self._memo))
-        self._done = True
 
     def getFlows(self):
         return FlowGraphSolver.Frame.recoverPaths(self._stack)
