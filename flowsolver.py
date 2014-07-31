@@ -140,7 +140,7 @@ class FlowGraphSolver(object):
                     break
 
             if len(best[1]) > 1:
-                lm = self._leafMoves()
+                lm = self._leafMoves(movesets)
                 if lm:
                     return (self._frameForMove(vidx, m) for vidx, m in lm)
             return (self._frameForMove(best[0], m) for m in best[1])
@@ -177,25 +177,23 @@ class FlowGraphSolver(object):
                 nextfree.remove(move)
             return self.__class__(self._graph, nextpairs, nextfree)
 
-        def _leafMoves(self):
+        def _leafMoves(self, movesets):
             """return list of (vidx, move) or None"""
-            d = {}  # open v : set of vidx
-            for vidx in xrange(len(self._headpairs) * 2):
-                hp = self._headpairs[vidx // 2]
-                subidx = vidx % 2
-                v, vother = hp[subidx], hp[1 - subidx]
-                if v == vother:
-                    continue
-                o = self._graph.adjacencies(v, self._openverts)
-                for ov in o:
-                    if ov not in d:
-                        d[ov] = set()
-                    d[ov].add(vidx)
-            for ov, vidxset in d.iteritems():
-                lov = len(self._graph.adjacencies(ov, self._openverts))
-                if lov == 1:
-                    return [(vidx, ov) for vidx in vidxset]
-            return None
+            # if any open vertex has 0 or 1 adjacent open vertices,
+            # it must be connected now via some adjacent path head
+            allmoves = reduce(set.union, movesets.values(), set())
+            leaf = None
+            for m in allmoves.intersection(self._openverts):
+                if len(self._graph.adjacencies(m, self._openverts)) < 2:
+                    leaf = m
+                    break
+            if leaf is None:
+                return None
+            leafmoves = []
+            for vidx, moves in movesets.iteritems():
+                if leaf in moves:
+                    leafmoves.append((vidx, leaf))
+            return leafmoves
 
         @staticmethod
         def recoverPaths(framestack):
