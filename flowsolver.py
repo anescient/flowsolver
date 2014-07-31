@@ -47,33 +47,27 @@ class FlowGraphSolver(object):
             self._graph = graph
             self._headpairs = headpairs
             self._openverts = openverts
-            try:
-                self._framegen = self._nextFrames()
-            except self.DeadEnd:
-                self._framegen = iter([])
+            self._framegen = None
+            self._coverstate = None
 
         @property
         def headPairs(self):
             return iter(self._headpairs)
 
-        def getCoverState(self):
+        @property
+        def coverState(self):
             """
                 Return a hashable value unique to the set of open vertices and
                 the locations of unconnected path heads.
             """
-            values = []
-            for v1, v2 in self._headpairs:
-                if v1 == v2:
-                    values.append(None)
-                    values.append(None)
-                elif v1 < v2:
-                    values.append(v1)
-                    values.append(v2)
-                else:
-                    values.append(v2)
-                    values.append(v1)
-            values.extend(self._openverts)
-            return tuple(values)
+            if self._coverstate is None:
+                openpairs = []
+                for v1, v2 in self._headpairs:
+                    if v1 != v2:
+                        openpairs.append((v1, v2) if v1 < v2 else (v2, v1))
+                self._coverstate = (frozenset(openpairs),
+                                    frozenset(self._openverts))
+            return self._coverstate
 
         def isSolved(self):
             return not self._openverts and \
@@ -124,6 +118,11 @@ class FlowGraphSolver(object):
             return False
 
         def takeNextFrame(self):
+            if self._framegen is None:
+                try:
+                    self._framegen = self._nextFrames()
+                except self.DeadEnd:
+                    self._framegen = iter([])
             return next(self._framegen, None)
 
         def _nextFrames(self):
@@ -220,20 +219,25 @@ class FlowGraphSolver(object):
     class Memo(object):
         def __init__(self):
             self._memo = {}
+            self._finds = 0
             self._hits = 0
             self._limit = 20000
+
+        @property
+        def hitRate(self):
+            return 0 if self._hits == 0 else self._hits / float(self._finds)
 
         def insert(self, frame):
             if len(self._memo) >= self._limit:
                 self._prune(3 * self._limit // 4)
-            self._memo[frame.getCoverState()] = 0
+            self._memo[frame.coverState] = self._finds
 
         def find(self, frame):
-            u = frame.getCoverState()
-            hit = u in self._memo
+            self._finds += 1
+            hit = frame.coverState in self._memo
             if hit:
                 self._hits += 1
-                self._memo[u] = self._hits
+                self._memo[frame.coverState] = self._finds
             return hit
 
         def _prune(self, limit):
@@ -275,6 +279,7 @@ class FlowGraphSolver(object):
                 self._memo.insert(self._stack.pop())
 
         print "{0} visited".format(self._totalframes)
+        print "{0:.2%} memo hit".format(self._memo.hitRate)
 
     def getFlows(self):
         return self.Frame.recoverPaths(self._stack)
