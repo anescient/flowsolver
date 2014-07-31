@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from itertools import islice, izip
 from gridgraph import GraphOntoRectangularGrid
 
 
@@ -55,7 +56,11 @@ class FlowGraphSolver(object):
         def headPairs(self):
             return iter(self._headpairs)
 
-        def getUnique(self):
+        def getCoverState(self):
+            """
+                Return a hashable value unique to the set of open vertices and
+                the locations of unconnected path heads.
+            """
             values = []
             for v1, v2 in self._headpairs:
                 if v1 == v2:
@@ -167,8 +172,9 @@ class FlowGraphSolver(object):
             oldpair = nextpairs[pairidx]
             newpair = (move, oldpair[1]) if subidx == 0 else (oldpair[0], move)
             nextpairs[pairidx] = newpair
-            nextfree = set(self._openverts)
+            nextfree = self._openverts
             if newpair[0] != newpair[1]:
+                nextfree = nextfree.copy()
                 nextfree.remove(move)
             return self.__class__(self._graph, nextpairs, nextfree)
 
@@ -198,8 +204,8 @@ class FlowGraphSolver(object):
                 return []
             pathpairs = [([v1], [v2]) for v1, v2 in framestack[0].headPairs]
             for frame in framestack[1:]:
-                for vp, pathpair in zip(frame.headPairs, pathpairs):
-                    for v, path in zip(vp, pathpair):
+                for vp, pathpair in izip(frame.headPairs, pathpairs):
+                    for v, path in izip(vp, pathpair):
                         if path[-1] != v:
                             path.append(v)
             paths = []
@@ -220,10 +226,10 @@ class FlowGraphSolver(object):
         def insert(self, frame):
             if len(self._memo) >= self._limit:
                 self._prune(3 * self._limit // 4)
-            self._memo[frame.getUnique()] = 0
+            self._memo[frame.getCoverState()] = 0
 
         def find(self, frame):
-            u = frame.getUnique()
+            u = frame.getCoverState()
             hit = u in self._memo
             if hit:
                 self._hits += 1
@@ -231,11 +237,9 @@ class FlowGraphSolver(object):
             return hit
 
         def _prune(self, limit):
-            elms = sorted(self._memo, key=self._memo.get, reverse=True)
-            prunememo = {}
-            for e in elms[:limit]:
-                prunememo[e] = self._memo[e]
-            self._memo = prunememo
+            keep = islice(\
+                sorted(self._memo, key=self._memo.get, reverse=True), limit)
+            self._memo = dict((k, self._memo[k]) for k in keep)
 
     def __init__(self, graph, endpointpairs):
         assert all(len(vp) == 2 for vp in endpointpairs)
