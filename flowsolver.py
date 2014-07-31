@@ -48,11 +48,16 @@ class FlowGraphSolver(object):
             self._headpairs = headpairs
             self._openverts = openverts
             self._framegen = None
+            self._framestaken = 0
             self._coverstate = None
 
         @property
         def headPairs(self):
             return iter(self._headpairs)
+
+        @property
+        def framesTaken(self):
+            return self._framestaken
 
         @property
         def coverState(self):
@@ -123,7 +128,10 @@ class FlowGraphSolver(object):
                     self._framegen = self._nextFrames()
                 except self.DeadEnd:
                     self._framegen = iter([])
-            return next(self._framegen, None)
+            f = next(self._framegen, None)
+            if f:
+                self._framestaken += 1
+            return f
 
         def _nextFrames(self):
             if not self._connectableAndCovered():
@@ -217,6 +225,7 @@ class FlowGraphSolver(object):
     class Memo(object):
         def __init__(self):
             self._memo = {}
+            self._inserts = 0
             self._finds = 0
             self._hits = 0
             self._limit = 20000
@@ -225,7 +234,12 @@ class FlowGraphSolver(object):
         def hitRate(self):
             return 0 if self._hits == 0 else self._hits / float(self._finds)
 
+        @property
+        def returnRate(self):
+            return 0 if self._hits == 0 else self._hits / float(self._inserts)
+
         def insert(self, frame):
+            self._inserts += 1
             if len(self._memo) >= self._limit:
                 self._prune(3 * self._limit // 4)
             self._memo[frame.coverState] = self._finds
@@ -274,10 +288,13 @@ class FlowGraphSolver(object):
             else:
                 if newtop:
                     return
-                self._memo.insert(self._stack.pop())
+                popframe = self._stack.pop()
+                if popframe.framesTaken > 0:
+                    self._memo.insert(popframe)
 
         print "{0} visited".format(self._totalframes)
-        print "{0:.2%} memo hit".format(self._memo.hitRate)
+        print "memo: {0:.2%} hit, {1:.2%} return".format(\
+            self._memo.hitRate, self._memo.returnRate)
 
     def getFlows(self):
         return self.Frame.recoverPaths(self._stack)
