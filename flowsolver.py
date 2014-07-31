@@ -141,17 +141,23 @@ class FlowGraphSolver(object):
                     bestmoves = moves
             if bestvidx is None:
                 return
-            pairidx = bestvidx // 2
-            subidx = bestvidx % 2
+            if len(bestmoves) > 1:
+                lm = self._leafMoves()
+                if lm:
+                    return (self._frameForMove(vidx, m) for vidx, m in lm)
+            return (self._frameForMove(bestvidx, m) for m in bestmoves)
+
+        def _frameForMove(self, vidx, move):
+            pairidx = vidx // 2
+            subidx = vidx % 2
             nextpairs = list(self._headpairs)
             oldpair = nextpairs[pairidx]
-            for m in bestmoves:
-                newpair = (m, oldpair[1]) if subidx == 0 else (oldpair[0], m)
-                nextpairs[pairidx] = newpair
-                nextfree = set(self._openverts)
-                if newpair[0] != newpair[1]:
-                    nextfree.remove(m)
-                yield FlowGraphSolver.Frame(self._graph, nextpairs, nextfree)
+            newpair = (move, oldpair[1]) if subidx == 0 else (oldpair[0], move)
+            nextpairs[pairidx] = newpair
+            nextfree = set(self._openverts)
+            if newpair[0] != newpair[1]:
+                nextfree.remove(move)
+            return FlowGraphSolver.Frame(self._graph, nextpairs, nextfree)
 
         def _movesForVertex(self, vidx):
             hp = self._headpairs[vidx // 2]
@@ -164,6 +170,27 @@ class FlowGraphSolver(object):
             if vother in adj:
                 moves.add(vother)
             return moves
+
+        def _leafMoves(self):
+            """return list of (vidx, move) or None"""
+            d = {}  # open v : set of vidx
+            for vidx in xrange(len(self._headpairs) * 2):
+                hp = self._headpairs[vidx // 2]
+                subidx = vidx % 2
+                v, vother = hp[subidx], hp[1 - subidx]
+                if v == vother:
+                    continue
+                o = self._graph.adjacencies(v).intersection(self._openverts)
+                for ov in o:
+                    if ov not in d:
+                        d[ov] = set()
+                    d[ov].add(vidx)
+            for ov, vidxset in d.iteritems():
+                lov = len(self._graph.adjacencies(ov)\
+                          .intersection(self._openverts))
+                if lov == 1:
+                    return [(vidx, ov) for vidx in vidxset]
+            return None
 
         @staticmethod
         def recoverPaths(framestack):
