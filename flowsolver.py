@@ -214,6 +214,32 @@ class FlowGraphSolver(object):
                     paths.append(p2)
             return paths
 
+    class Memo(object):
+        def __init__(self):
+            self._memo = {}
+            self._hits = 0
+            self._limit = 20000
+
+        def insert(self, frame):
+            if len(self._memo) >= self._limit:
+                self._prune(3 * self._limit // 4)
+            self._memo[frame.getUnique()] = 0
+
+        def find(self, frame):
+            u = frame.getUnique()
+            hit = u in self._memo
+            if hit:
+                self._hits += 1
+                self._memo[u] = self._hits
+            return hit
+
+        def _prune(self, limit):
+            elms = sorted(self._memo, key=self._memo.get, reverse=True)
+            prunememo = {}
+            for e in elms[:limit]:
+                prunememo[e] = self._memo[e]
+            self._memo = prunememo
+
     def __init__(self, graph, endpointpairs):
         assert all(len(vp) == 2 for vp in endpointpairs)
         assert len(reduce(set.union, map(set, endpointpairs), set())) == \
@@ -222,7 +248,7 @@ class FlowGraphSolver(object):
         openverts -= set(v for vp in endpointpairs for v in vp)
         self._stack = [self.Frame(graph, list(endpointpairs), openverts)]
         self._totalframes = 1
-        self._memo = set()
+        self._memo = self.Memo()
 
     @property
     def done(self):
@@ -232,27 +258,22 @@ class FlowGraphSolver(object):
         if self.done:
             return
         newtop = False
-        lastpop = None
         while self._stack:
             nextframe = self._stack[-1].takeNextFrame()
             if nextframe:
-                if lastpop:
-                    self._memo.add(lastpop.getUnique())
-                    lastpop = None
                 self._totalframes += 1
-                if nextframe.getUnique() in self._memo:
+                if self._memo.find(nextframe):
                     continue
                 self._stack.append(nextframe)
                 if nextframe.isSolved():
                     break
                 newtop = True
             else:
-                lastpop = self._stack.pop()
+                self._memo.insert(self._stack.pop())
                 if newtop:
                     return
 
         print "{0} visited".format(self._totalframes)
-        print "{0} memoized".format(len(self._memo))
 
     def getFlows(self):
         return self.Frame.recoverPaths(self._stack)
