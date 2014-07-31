@@ -232,21 +232,22 @@ class FlowGraphSolver(object):
         if self.done:
             return
         newtop = False
+        lastpop = None
         while self._stack:
-            top = self._stack[-1]
-            nextframe = top.takeNextFrame()
+            nextframe = self._stack[-1].takeNextFrame()
             if nextframe:
+                if lastpop:
+                    self._memo.add(lastpop.getUnique())
+                    lastpop = None
                 self._totalframes += 1
-                u = nextframe.getUnique()
-                if u in self._memo:
+                if nextframe.getUnique() in self._memo:
                     continue
-                self._memo.add(u)
                 self._stack.append(nextframe)
                 if nextframe.isSolved():
                     break
                 newtop = True
             else:
-                self._stack.pop()
+                lastpop = self._stack.pop()
                 if newtop:
                     return
 
