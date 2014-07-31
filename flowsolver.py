@@ -113,8 +113,7 @@ class FlowGraphSolver(object):
                     heads.add(v2)
             active = heads.union(self._openverts)
             for ov in self._openverts:
-                adj = self._graph.adjacencies(ov)
-                x = len(adj.intersection(active))
+                x = len(self._graph.adjacencies(ov, active))
                 assert x > 0
                 if x == 1:
                     return True
@@ -149,8 +148,8 @@ class FlowGraphSolver(object):
                 v1, v2 = hp
                 if v1 == v2:
                     continue
-                m1 = self._graph.adjacencies(v1) & self._openverts
-                m2 = self._graph.adjacencies(v2) & self._openverts
+                m1 = self._graph.adjacencies(v1, self._openverts)
+                m2 = self._graph.adjacencies(v2, self._openverts)
                 if self._graph.adjacent(v1, v2):
                     m1.add(v2)
                     m2.add(v1)
@@ -183,14 +182,13 @@ class FlowGraphSolver(object):
                 v, vother = hp[subidx], hp[1 - subidx]
                 if v == vother:
                     continue
-                o = self._graph.adjacencies(v).intersection(self._openverts)
+                o = self._graph.adjacencies(v, self._openverts)
                 for ov in o:
                     if ov not in d:
                         d[ov] = set()
                     d[ov].add(vidx)
             for ov, vidxset in d.iteritems():
-                lov = len(self._graph.adjacencies(ov)\
-                          .intersection(self._openverts))
+                lov = len(self._graph.adjacencies(ov, self._openverts))
                 if lov == 1:
                     return [(vidx, ov) for vidx in vidxset]
             return None

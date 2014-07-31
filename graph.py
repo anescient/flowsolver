@@ -9,7 +9,7 @@ class SimpleGraph(object):
 
     @property
     def vertices(self):
-        return self._edges.keys()
+        return iter(self._edges)
 
     def pushVertex(self):
         """Return new vertex id."""
@@ -27,7 +27,6 @@ class SimpleGraph(object):
     def addEdge(self, v1, v2):
         """Connect v1 and v2. Error if loop or already connected."""
         assert v1 != v2
-        assert v1 not in self._edges[v2]
         assert v2 not in self._edges[v1]
         self._edges[v1].add(v2)
         self._edges[v2].add(v1)
@@ -36,9 +35,16 @@ class SimpleGraph(object):
         """Return True iff v1 and v2 share an edge."""
         return v2 in self._edges[v1]
 
-    def adjacencies(self, v):
-        """Return set of vertices adjacent to v. Never includes v."""
-        return self._edges[v]
+    def adjacencies(self, v, vertices=None):
+        """
+            vertices: use only these vertices and their incident edges
+                      if None, use all vertices in graph
+            Return set of vertices adjacent to v. Never includes v.
+        """
+        if vertices is None:
+            return self._edges[v]
+        else:
+            return self._edges[v].intersection(vertices)
 
     def connectedComponent(self, v, vertices=None):
         """
@@ -54,19 +60,8 @@ class SimpleGraph(object):
             v = toVisit.pop()
             component.add(v)
             openVerts.remove(v)
-            toVisit |= self.adjacencies(v).intersection(openVerts)
+            toVisit |= self.adjacencies(v, openVerts)
         return component
-
-    def connectedComponentMasked(self, v, maskVertices=None):
-        """
-            maskVertices: exclude these vertices and their incident edges
-            Return set of vertices connected by some path to v (including v).
-        """
-        if maskVertices is None:
-            return self.connectedComponent(v)
-        else:
-            return self.connectedComponent(v, \
-                set(self.vertices) - set(maskVertices))
 
     def disjointPartitions(self, vertices=None):
         """
@@ -84,19 +79,6 @@ class SimpleGraph(object):
             partitions.append(p)
         return partitions
 
-    def disjointPartitionsMasked(self, maskVertices=None):
-        """
-            maskVertices: exclude these vertices and their incident edges
-            Return list of sets of vertices.
-            Vertices in each set are connected.
-            Sets are not connected to each other.
-        """
-        if maskVertices is None:
-            return self.disjointPartitions()
-        else:
-            return self.disjointPartitions(\
-                set(self.vertices) - set(maskVertices))
-
 
 def _test():
     g = SimpleGraph()
@@ -106,8 +88,8 @@ def _test():
     assert len(set(verts)) == len(verts)
     for v in verts:
         assert len(g.adjacencies(v)) == 0
-        assert g.connectedComponentMasked(v) == set([v])
-    parts = g.disjointPartitionsMasked()
+        assert g.connectedComponent(v) == set([v])
+    parts = g.disjointPartitions()
     assert len(parts) == len(verts)
     s = set()
     for p in parts:
@@ -117,8 +99,8 @@ def _test():
     for i in xrange(len(verts) - 1):
         g.addEdge(verts[i], verts[i + 1])
     for v in verts:
-        assert g.connectedComponentMasked(v) == set(verts)
-    parts = g.disjointPartitionsMasked(verts[2:3])
+        assert g.connectedComponent(v) == set(verts)
+    parts = g.disjointPartitions(verts[:2] + verts[3:])
     assert len(parts) == 2
     assert len(parts[0].intersection(parts[1])) == 0
     assert verts[2] not in parts[0].union(parts[1])
@@ -130,19 +112,20 @@ def _test():
     assert len(g.adjacencies(verts[-1])) == 0
     for v in verts[:-1]:
         assert len(g.adjacencies(v)) == 1
-    assert len(g.disjointPartitionsMasked()) == 4
-    assert len(g.disjointPartitionsMasked(verts[:1])) == 4
-    assert len(g.disjointPartitionsMasked(verts[:2])) == 3
-    assert g.connectedComponentMasked(verts[-1]) == set(verts[-1:])
-    assert g.connectedComponentMasked(verts[1], verts[:1]) == set(verts[1:2])
-    backbone = [list(p)[0] for p in g.disjointPartitionsMasked()]
+    assert len(g.disjointPartitions()) == 4
+    assert len(g.disjointPartitions(verts[1:])) == 4
+    assert len(g.disjointPartitions(verts[2:])) == 3
+    assert g.connectedComponent(verts[-1]) == set(verts[-1:])
+    assert g.connectedComponent(verts[1], verts[1:]) == set(verts[1:2])
+    backbone = [list(p)[0] for p in g.disjointPartitions()]
     for i in xrange(len(backbone) - 1):
         g.addEdge(backbone[i], backbone[i + 1])
     g.addEdge(backbone[0], backbone[-1])
-    assert len(g.disjointPartitionsMasked()) == 1
-    assert g.connectedComponentMasked(verts[0]) == set(verts)
-    print "Tests passed."
-    return 0
+    assert len(g.disjointPartitions()) == 1
+    assert g.connectedComponent(verts[0]) == set(verts)
+
 
 if __name__ == '__main__':
-    exit(_test())
+    _test()
+    print "Tests passed."
+    exit(0)
