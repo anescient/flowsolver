@@ -38,11 +38,18 @@ class FlowBoardSolver(object):
 class FlowGraphSolver(object):
 
     class Frame(object):
+
+        class DeadEnd(Exception):
+            pass
+
         def __init__(self, graph, headpairs, openverts):
             self._graph = graph
             self._headpairs = headpairs
             self._openverts = openverts
-            self._framegen = self._nextFrames()
+            try:
+                self._framegen = self._nextFrames()
+            except self.DeadEnd:
+                self._framegen = iter([])
 
         @property
         def headPairs(self):
@@ -118,9 +125,9 @@ class FlowGraphSolver(object):
 
         def _nextFrames(self):
             if not self._connectableAndCovered():
-                return iter([])
+                raise self.DeadEnd()
             if self._hasDeadEnd():
-                return iter([])
+                raise self.DeadEnd()
             bestvidx = None
             bestmoves = None
             for vidx in xrange(len(self._headpairs) * 2):
@@ -128,7 +135,7 @@ class FlowGraphSolver(object):
                 if moves is None:
                     continue
                 if len(moves) == 0:
-                    return
+                    raise self.DeadEnd()
                 if bestmoves is None or len(moves) < len(bestmoves):
                     bestvidx = vidx
                     bestmoves = moves
@@ -150,7 +157,7 @@ class FlowGraphSolver(object):
             nextfree = set(self._openverts)
             if newpair[0] != newpair[1]:
                 nextfree.remove(move)
-            return FlowGraphSolver.Frame(self._graph, nextpairs, nextfree)
+            return self.__class__(self._graph, nextpairs, nextfree)
 
         def _movesForVertex(self, vidx):
             hp = self._headpairs[vidx // 2]
@@ -210,8 +217,7 @@ class FlowGraphSolver(object):
                2 * len(endpointpairs)
         openverts = set(graph.vertices)
         openverts -= set(v for vp in endpointpairs for v in vp)
-        self._stack = [FlowGraphSolver.Frame(\
-            graph, list(endpointpairs), openverts)]
+        self._stack = [self.Frame(graph, list(endpointpairs), openverts)]
         self._totalframes = 1
         self._memo = set()
 
@@ -245,4 +251,4 @@ class FlowGraphSolver(object):
         print "{0} memoized".format(len(self._memo))
 
     def getFlows(self):
-        return FlowGraphSolver.Frame.recoverPaths(self._stack)
+        return self.Frame.recoverPaths(self._stack)
