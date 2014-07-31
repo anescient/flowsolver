@@ -53,7 +53,7 @@ class FlowGraphSolver(object):
 
         @property
         def headPairs(self):
-            return (hp for hp in self._headpairs)
+            return iter(self._headpairs)
 
         def getUnique(self):
             values = []
@@ -61,8 +61,7 @@ class FlowGraphSolver(object):
                 if v1 == v2:
                     values.append(None)
                     values.append(None)
-                elif v1 < v2:  # todo determine whether this actually matters
-                               # i.e. whether both cases are possible
+                elif v1 < v2:
                     values.append(v1)
                     values.append(v2)
                 else:
