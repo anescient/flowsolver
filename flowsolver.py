@@ -269,9 +269,9 @@ class FlowGraphSolver(object):
                     break
                 newtop = True
             else:
-                self._memo.insert(self._stack.pop())
                 if newtop:
                     return
+                self._memo.insert(self._stack.pop())
 
         print "{0} visited".format(self._totalframes)
 
