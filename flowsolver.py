@@ -128,24 +128,39 @@ class FlowGraphSolver(object):
                 raise self.DeadEnd()
             if self._hasDeadEnd():
                 raise self.DeadEnd()
-            bestvidx = None
-            bestmoves = None
-            for vidx in xrange(len(self._headpairs) * 2):
-                moves = self._movesForVertex(vidx)
-                if moves is None:
-                    continue
-                if len(moves) == 0:
-                    raise self.DeadEnd()
-                if bestmoves is None or len(moves) < len(bestmoves):
-                    bestvidx = vidx
-                    bestmoves = moves
-            if bestvidx is None:
-                return
-            if len(bestmoves) > 1:
+
+            movesets = self._possibleMoves()
+            best = None
+            for vidx, moves in movesets.iteritems():
+                if best is None or len(moves) < len(best[1]):
+                    best = (vidx, moves)
+                if len(moves) == 1:
+                    break
+
+            if len(best[1]) > 1:
                 lm = self._leafMoves()
                 if lm:
                     return (self._frameForMove(vidx, m) for vidx, m in lm)
-            return (self._frameForMove(bestvidx, m) for m in bestmoves)
+            return (self._frameForMove(best[0], m) for m in best[1])
+
+        def _possibleMoves(self):
+            moves = {}  # vidx : set of vertices to move to
+            for pairidx, hp in enumerate(self._headpairs):
+                v1, v2 = hp
+                if v1 == v2:
+                    continue
+                m1 = self._graph.adjacencies(v1) & self._openverts
+                m2 = self._graph.adjacencies(v2) & self._openverts
+                if self._graph.adjacent(v1, v2):
+                    m1.add(v2)
+                    m2.add(v1)
+                if not m1 or not m2:
+                    raise self.DeadEnd()
+                moves[2 * pairidx] = m1
+                moves[2 * pairidx + 1] = m2
+            if not moves:
+                raise self.DeadEnd()
+            return moves
 
         def _frameForMove(self, vidx, move):
             pairidx = vidx // 2
@@ -158,18 +173,6 @@ class FlowGraphSolver(object):
             if newpair[0] != newpair[1]:
                 nextfree.remove(move)
             return self.__class__(self._graph, nextpairs, nextfree)
-
-        def _movesForVertex(self, vidx):
-            hp = self._headpairs[vidx // 2]
-            subidx = vidx % 2
-            v, vother = hp[subidx], hp[1 - subidx]
-            if v == vother:
-                return None
-            adj = self._graph.adjacencies(v)
-            moves = adj.intersection(self._openverts)
-            if vother in adj:
-                moves.add(vother)
-            return moves
 
         def _leafMoves(self):
             """return list of (vidx, move) or None"""
