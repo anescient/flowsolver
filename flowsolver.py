@@ -68,17 +68,6 @@ class FlowGraphSolver(object):
             return not self._openverts and \
                    all(v1 == v2 for v1, v2 in self._headpairs)
 
-        def heuristicUnsolvable(self):
-            """
-                Return True if this state cannot lead to a solution,
-                False if this state _might_ lead to a solution.
-            """
-            if not self._connectableAndCovered():
-                return True
-            if self._hasDeadEnd():
-                return True
-            return False
-
         def _connectableAndCovered(self):
             """
                 Return True iff all pairs can be connected and
@@ -128,6 +117,10 @@ class FlowGraphSolver(object):
             return next(self._framegen, None)
 
         def _nextFrames(self):
+            if not self._connectableAndCovered():
+                return iter([])
+            if self._hasDeadEnd():
+                return iter([])
             bestvidx = None
             bestmoves = None
             for vidx in xrange(len(self._headpairs) * 2):
@@ -232,22 +225,18 @@ class FlowGraphSolver(object):
         newtop = False
         while self._stack:
             top = self._stack[-1]
-            pop = top.heuristicUnsolvable()
-            if not pop:
-                nextframe = top.takeNextFrame()
-                if nextframe:
-                    self._totalframes += 1
-                    u = nextframe.getUnique()
-                    if u in self._memo:
-                        continue
-                    self._memo.add(u)
-                    self._stack.append(nextframe)
-                    if nextframe.isSolved():
-                        break
-                    newtop = True
-                else:
-                    pop = True
-            if pop:
+            nextframe = top.takeNextFrame()
+            if nextframe:
+                self._totalframes += 1
+                u = nextframe.getUnique()
+                if u in self._memo:
+                    continue
+                self._memo.add(u)
+                self._stack.append(nextframe)
+                if nextframe.isSolved():
+                    break
+                newtop = True
+            else:
                 self._stack.pop()
                 if newtop:
                     return
