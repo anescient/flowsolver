@@ -136,7 +136,11 @@ class FlowSolvingPopup(QDialog):
             self._timer.stop()
         else:
             self._setMessage("running for " + self._getTimerStr())
-            self._solverWidget.run()
+            try:
+                self._solverWidget.run()
+            except:
+                self._timer.stop()
+                raise
 
 
 if __name__ == '__main__':
