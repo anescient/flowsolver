@@ -78,6 +78,24 @@ class FlowGraphSolver(object):
             return not self._openverts and \
                    all(v1 == v2 for v1, v2 in self._headpairs)
 
+        def copy(self, move=None):
+            frame = self.__class__(\
+                self._graph, self._headpairs, self._openverts)
+            if move:
+                frame.applyMove(*move)
+            return frame
+
+        def applyMove(self, vidx, to):
+            pairidx = vidx // 2
+            subidx = vidx % 2
+            self._headpairs = list(self._headpairs)
+            oldpair = self._headpairs[pairidx]
+            newpair = (to, oldpair[1]) if subidx == 0 else (oldpair[0], to)
+            self._headpairs[pairidx] = newpair
+            if newpair[0] != newpair[1]:
+                self._openverts = self._openverts.copy()
+                self._openverts.remove(to)
+
         def _connectableAndCovered(self):
             """
                 Return True iff all pairs can be connected and
@@ -150,8 +168,8 @@ class FlowGraphSolver(object):
             if len(best[1]) > 1:
                 lm = self._leafMoves(movesets)
                 if lm:
-                    return (self._frameForMove(vidx, m) for vidx, m in lm)
-            return (self._frameForMove(best[0], m) for m in best[1])
+                    return (self.copy(move) for move in lm)
+            return (self.copy((best[0], to)) for to in best[1])
 
         def _possibleMoves(self):
             moves = {}  # vidx : set of vertices to move to
@@ -172,19 +190,6 @@ class FlowGraphSolver(object):
                 raise self.DeadEnd()
             return moves
 
-        def _frameForMove(self, vidx, move):
-            pairidx = vidx // 2
-            subidx = vidx % 2
-            nextpairs = list(self._headpairs)
-            oldpair = nextpairs[pairidx]
-            newpair = (move, oldpair[1]) if subidx == 0 else (oldpair[0], move)
-            nextpairs[pairidx] = newpair
-            nextfree = self._openverts
-            if newpair[0] != newpair[1]:
-                nextfree = nextfree.copy()
-                nextfree.remove(move)
-            return self.__class__(self._graph, nextpairs, nextfree)
-
         def _leafMoves(self, movesets):
             """return list of (vidx, move) or None"""
             # if any open vertex has 0 or 1 adjacent open vertices,
@@ -202,6 +207,15 @@ class FlowGraphSolver(object):
                 if leaf in moves:
                     leafmoves.append((vidx, leaf))
             return leafmoves
+
+        @classmethod
+        def initial(cls, graph, endpointpairs):
+            assert all(len(vp) == 2 for vp in endpointpairs)
+            assert len(reduce(set.union, map(set, endpointpairs), set())) == \
+                   2 * len(endpointpairs)
+            openverts = set(graph.vertices)
+            openverts -= set(v for vp in endpointpairs for v in vp)
+            return cls(graph, list(endpointpairs), openverts)
 
         @staticmethod
         def recoverPaths(framestack):
@@ -258,12 +272,7 @@ class FlowGraphSolver(object):
             self._memo = dict((k, self._memo[k]) for k in keep)
 
     def __init__(self, graph, endpointpairs):
-        assert all(len(vp) == 2 for vp in endpointpairs)
-        assert len(reduce(set.union, map(set, endpointpairs), set())) == \
-               2 * len(endpointpairs)
-        openverts = set(graph.vertices)
-        openverts -= set(v for vp in endpointpairs for v in vp)
-        self._stack = [self.Frame(graph, list(endpointpairs), openverts)]
+        self._stack = [self.Frame.initial(graph, endpointpairs)]
         self._totalframes = 1
         self._memo = self.Memo()
 
