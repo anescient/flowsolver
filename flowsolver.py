@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from itertools import islice, izip
+from itertools import islice
 from gridgraph import GraphOntoRectangularGrid
 
 
@@ -50,6 +50,11 @@ class FlowGraphSolver(object):
             self._framegen = None
             self._framestaken = 0
             self._coverstate = None
+            self._moveApplied = None
+
+        @property
+        def moveApplied(self):
+            return self._moveApplied
 
         @property
         def headPairs(self):
@@ -86,11 +91,13 @@ class FlowGraphSolver(object):
             return frame
 
         def applyMove(self, vidx, to):
+            assert self._moveApplied is None
             pairidx = vidx // 2
             subidx = vidx % 2
             self._headpairs = list(self._headpairs)
             oldpair = self._headpairs[pairidx]
             newpair = (to, oldpair[1]) if subidx == 0 else (oldpair[0], to)
+            self._moveApplied = (oldpair[subidx], to)
             self._headpairs[pairidx] = newpair
             if newpair[0] != newpair[1]:
                 self._openverts = self._openverts.copy()
@@ -223,10 +230,9 @@ class FlowGraphSolver(object):
                 return []
             pathpairs = [([v1], [v2]) for v1, v2 in framestack[0].headPairs]
             for frame in framestack[1:]:
-                for vp, pathpair in izip(frame.headPairs, pathpairs):
-                    for v, path in izip(vp, pathpair):
-                        if path[-1] != v:
-                            path.append(v)
+                for path in (p for pp in pathpairs for p in pp):
+                    if path[-1] == frame.moveApplied[0]:
+                        path.append(frame.moveApplied[1])
             paths = []
             for p1, p2 in pathpairs:
                 if p1[-1] == p2[-1]:
