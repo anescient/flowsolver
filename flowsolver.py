@@ -111,9 +111,12 @@ class FlowGraphSolver(object):
                     c = c.copy()
                     c.remove(v)
                     if c:
-                        parts = self._graph.disjointPartitions(c)
-                        self._components[i] = parts[0]
-                        self._components.extend(parts[1:])
+                        if self._graph.isSeparator(v, c):
+                            parts = self._graph.disjointPartitions(c)
+                            self._components[i] = parts[0]
+                            self._components.extend(parts[1:])
+                        else:
+                            self._components[i] = c
                     else:
                         self._components.pop(i)
                     break

@@ -31,6 +31,12 @@ class SimpleGraph(object):
         self._edges[v1].add(v2)
         self._edges[v2].add(v1)
 
+    def removeEdge(self, v1, v2):
+        """Disconnect v1 and v2. Error if not connected."""
+        assert v1 != v2
+        self._edges[v1].remove(v2)
+        self._edges[v2].remove(v1)
+
     def adjacent(self, v1, v2):
         """Return True iff v1 and v2 share an edge."""
         return v2 in self._edges[v1]
@@ -45,6 +51,86 @@ class SimpleGraph(object):
             return self._edges[v]
         else:
             return self._edges[v].intersection(vertices)
+
+    def connected(self, v1, v2, vertices=None):
+        """
+            vertices: use only these vertices and their incident edges
+                      if None, use all vertices in graph
+            Return True iff there is some path from v1 to v2.
+        """
+        assert v1 != v2
+        if v2 in self._edges[v1]:
+            return True
+        openVerts = set(self.vertices if vertices is None else vertices)
+        openVerts.discard(v1)
+        openVerts.discard(v2)
+        front1 = self.adjacencies(v1, openVerts)
+        front2 = self.adjacencies(v2, openVerts)
+        if not front1 or not front2:
+            return False
+        flip = False
+        while not front1.intersection(front2):
+            if flip:
+                openVerts -= front1
+                front1 = set.union(\
+                    *(self.adjacencies(fv, openVerts) for fv in front1))
+                if not front1:
+                    return False
+            else:
+                openVerts -= front2
+                front2 = set.union(\
+                    *(self.adjacencies(fv, openVerts) for fv in front2))
+                if not front2:
+                    return False
+            flip = not flip
+        return True
+
+    def isConnectedSet(self, vset, vertices=None):
+        """
+            vertices: use only these vertices and their incident edges
+                      if None, use all vertices in graph
+            Return True iff all vertices in vset are connected.
+        """
+        if len(vset) == 1:
+            return True
+        elif len(vset) == 2:
+            it = iter(vset)
+            return self.connected(next(it), next(it), vertices)
+        openVerts = set(self.vertices if vertices is None else vertices)
+        openVerts |= vset
+        fronts = [self.adjacencies(v, openVerts) for v in vset]
+        if not all(fronts):
+            return False
+        openVerts -= vset
+        while len(fronts) > 1:
+            front = fronts.pop(0)
+            joined = False
+            for joinfront in fronts:
+                if front.intersection(joinfront):
+                    joinfront |= front
+                    joined = True
+            if joined:
+                continue
+            openVerts -= front
+            front = set.union(\
+                *(self.adjacencies(fv, openVerts) for fv in front))
+            if not front:
+                return False
+            fronts.append(front)
+        return True
+
+    def isSeparator(self, v, vertices=None):
+        """
+            vertices: use only these vertices and their incident edges
+                      if None, use all vertices in graph
+            Return True iff removing v will divide v's connected component.
+        """
+        openVerts = set(self.vertices if vertices is None else vertices)
+        links = self.adjacencies(v, openVerts)
+        if len(links) < 2:
+            return False
+        openVerts.discard(v)
+        return not self.isConnectedSet(links, openVerts)
 
     def connectedComponent(self, v, vertices=None):
         """
@@ -89,6 +175,8 @@ def _test():
     for v in verts:
         assert len(g.adjacencies(v)) == 0
         assert g.connectedComponent(v) == set([v])
+        assert not g.isSeparator(v)
+        assert g.isConnectedSet([v])
     parts = g.disjointPartitions()
     assert len(parts) == len(verts)
     s = set()
@@ -98,11 +186,26 @@ def _test():
     assert s == set(verts)
     for i in xrange(len(verts) - 1):
         g.addEdge(verts[i], verts[i + 1])
+        for v in verts[i + 2:]:
+            assert not g.connected(verts[i + 1], v)
+        for j in xrange(i + 1):
+            if j > 0:
+                assert g.connected(verts[0], verts[j])
+            assert g.connectedComponent(verts[j]) == set(verts[:i + 2])
     for v in verts:
         assert g.connectedComponent(v) == set(verts)
+    assert not g.isSeparator(verts[0])
+    assert not g.isSeparator(verts[-1])
+    assert all(g.isSeparator(v) for v in verts[1:-1])
+    g.addEdge(verts[0], verts[-1])
+    assert not any(g.isSeparator(v) for v in verts)
+    g.removeEdge(verts[0], verts[-1])
     parts = g.disjointPartitions(verts[:2] + verts[3:])
     assert len(parts) == 2
     assert len(parts[0].intersection(parts[1])) == 0
+    assert g.isConnectedSet(parts[0])
+    assert g.isConnectedSet(parts[1])
+    assert not g.isConnectedSet(set(verts))
     assert verts[2] not in parts[0].union(parts[1])
     assert parts[0].union(parts[1]) == set(verts) - set(verts[2:3])
     drops = [verts[i] for i in [2, 5, 8]]
@@ -112,6 +215,7 @@ def _test():
     assert len(g.adjacencies(verts[-1])) == 0
     for v in verts[:-1]:
         assert len(g.adjacencies(v)) == 1
+        assert not g.isSeparator(v)
     assert len(g.disjointPartitions()) == 4
     assert len(g.disjointPartitions(verts[1:])) == 4
     assert len(g.disjointPartitions(verts[2:])) == 3
@@ -123,6 +227,8 @@ def _test():
     g.addEdge(backbone[0], backbone[-1])
     assert len(g.disjointPartitions()) == 1
     assert g.connectedComponent(verts[0]) == set(verts)
+    assert g.connected(verts[0], verts[-1])
+    assert g.isConnectedSet(set(verts[:1] + verts[-1:]))
 
 
 if __name__ == '__main__':
