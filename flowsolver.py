@@ -50,11 +50,11 @@ class FlowGraphSolver(object):
             self._framegen = None
             self._framestaken = 0
             self._coverstate = None
-            self._moveApplied = None
+            self._moveapplied = None
 
         @property
         def moveApplied(self):
-            return self._moveApplied
+            return self._moveapplied
 
         @property
         def headPairs(self):
@@ -86,12 +86,12 @@ class FlowGraphSolver(object):
             return frame
 
         def applyMove(self, vidx, to):
-            assert self._moveApplied is None
+            assert self._moveapplied is None
             pairidx = vidx // 2
             subidx = vidx % 2
             oldpair = self._headpairs[pairidx]
             head, other = oldpair[subidx], oldpair[1 - subidx]
-            self._moveApplied = (head, to)
+            self._moveapplied = (head, to)
             self._headpairs = list(self._headpairs)
             if to == other:
                 self._headpairs.pop(pairidx)
@@ -130,9 +130,15 @@ class FlowGraphSolver(object):
                 Returns True iff any open vertex is adjacent only to
                 one other open vertex or path head.
             """
+            if self._moveapplied:
+                checkverts = self._graph.adjacencies(self._moveapplied[0]) | \
+                             self._graph.adjacencies(self._moveapplied[1])
+                checkverts &= self._openverts
+            else:
+                checkverts = self._openverts
             active = self._openverts.union(chain(*self._headpairs))
-            for ov in self._openverts:
-                x = len(self._graph.adjacencies(ov, active))
+            for v in checkverts:
+                x = len(self._graph.adjacencies(v, active))
                 assert x > 0
                 if x == 1:
                     return True
