@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from itertools import islice
+from itertools import islice, chain
 from gridgraph import GraphOntoRectangularGrid
 
 
@@ -71,17 +71,12 @@ class FlowGraphSolver(object):
                 the locations of unconnected path heads.
             """
             if self._coverstate is None:
-                openpairs = []
-                for v1, v2 in self._headpairs:
-                    if v1 != v2:
-                        openpairs.append((v1, v2) if v1 < v2 else (v2, v1))
-                self._coverstate = (frozenset(openpairs),
+                self._coverstate = (frozenset(self._headpairs),
                                     frozenset(self._openverts))
             return self._coverstate
 
         def isSolved(self):
-            return not self._openverts and \
-                   all(v1 == v2 for v1, v2 in self._headpairs)
+            return not self._openverts and not self._headpairs
 
         def copy(self, move=None):
             frame = self.__class__(\
@@ -94,12 +89,15 @@ class FlowGraphSolver(object):
             assert self._moveApplied is None
             pairidx = vidx // 2
             subidx = vidx % 2
-            self._headpairs = list(self._headpairs)
             oldpair = self._headpairs[pairidx]
-            newpair = (to, oldpair[1]) if subidx == 0 else (oldpair[0], to)
-            self._moveApplied = (oldpair[subidx], to)
-            self._headpairs[pairidx] = newpair
-            if newpair[0] != newpair[1]:
+            head, other = oldpair[subidx], oldpair[1 - subidx]
+            self._moveApplied = (head, to)
+            self._headpairs = list(self._headpairs)
+            if to == other:
+                self._headpairs.pop(pairidx)
+            else:
+                self._headpairs[pairidx] = \
+                    (to, other) if to < other else (other, to)
                 self._openverts = self._openverts.copy()
                 self._openverts.remove(to)
 
@@ -111,8 +109,6 @@ class FlowGraphSolver(object):
             components = self._graph.disjointPartitions(self._openverts)
             covered = set()
             for v1, v2 in self._headpairs:
-                if v1 == v2:
-                    continue
                 acis1 = self._adjacentComponentIndices(components, v1)
                 acis2 = self._adjacentComponentIndices(components, v2)
                 commonacis = acis1.intersection(acis2)
@@ -134,12 +130,7 @@ class FlowGraphSolver(object):
                 Returns True iff any open vertex is adjacent only to
                 one other open vertex or path head.
             """
-            heads = set()
-            for v1, v2 in self._headpairs:
-                if v1 != v2:
-                    heads.add(v1)
-                    heads.add(v2)
-            active = heads.union(self._openverts)
+            active = self._openverts.union(chain(*self._headpairs))
             for ov in self._openverts:
                 x = len(self._graph.adjacencies(ov, active))
                 assert x > 0
@@ -153,10 +144,10 @@ class FlowGraphSolver(object):
                     self._framegen = self._nextFrames()
                 except self.DeadEnd:
                     self._framegen = iter([])
-            f = next(self._framegen, None)
-            if f:
+            frame = next(self._framegen, None)
+            if frame:
                 self._framestaken += 1
-            return f
+            return frame
 
         def _nextFrames(self):
             if not self._connectableAndCovered():
@@ -173,17 +164,14 @@ class FlowGraphSolver(object):
                     break
 
             if len(best[1]) > 1:
-                lm = self._leafMoves(movesets)
-                if lm:
-                    return (self.copy(move) for move in lm)
+                leafmoves = self._leafMoves(movesets)
+                if leafmoves:
+                    return (self.copy(move) for move in leafmoves)
             return (self.copy((best[0], to)) for to in best[1])
 
         def _possibleMoves(self):
             moves = {}  # vidx : set of vertices to move to
-            for pairidx, hp in enumerate(self._headpairs):
-                v1, v2 = hp
-                if v1 == v2:
-                    continue
+            for pairidx, (v1, v2) in enumerate(self._headpairs):
                 m1 = self._graph.adjacencies(v1, self._openverts)
                 m2 = self._graph.adjacencies(v2, self._openverts)
                 if self._graph.adjacent(v1, v2):
@@ -222,7 +210,8 @@ class FlowGraphSolver(object):
                    2 * len(endpointpairs)
             openverts = set(graph.vertices)
             openverts -= set(v for vp in endpointpairs for v in vp)
-            return cls(graph, list(endpointpairs), openverts)
+            headpairs = [tuple(sorted(ep)) for ep in endpointpairs]
+            return cls(graph, headpairs, openverts)
 
         @staticmethod
         def recoverPaths(framestack):
