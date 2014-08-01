@@ -43,10 +43,11 @@ class FlowGraphSolver(object):
         class DeadEnd(Exception):
             pass
 
-        def __init__(self, graph, headpairs, openverts):
+        def __init__(self, graph, headpairs, openverts, components):
             self._graph = graph
             self._headpairs = headpairs
             self._openverts = openverts
+            self._components = components
             self._framegen = None
             self._framestaken = 0
             self._coverstate = None
@@ -80,7 +81,8 @@ class FlowGraphSolver(object):
 
         def copy(self, move=None):
             frame = self.__class__(\
-                self._graph, self._headpairs, self._openverts)
+                self._graph, self._headpairs, \
+                self._openverts, self._components)
             if move:
                 frame.applyMove(*move)
             return frame
@@ -98,29 +100,43 @@ class FlowGraphSolver(object):
             else:
                 self._headpairs[pairidx] = \
                     (to, other) if to < other else (other, to)
-                self._openverts = self._openverts.copy()
-                self._openverts.remove(to)
+                self._closeVertex(to)
+
+        def _closeVertex(self, v):
+            self._openverts = self._openverts.copy()
+            self._openverts.remove(v)
+            self._components = list(self._components)
+            for i, c in enumerate(self._components):
+                if v in c:
+                    c = c.copy()
+                    c.remove(v)
+                    if c:
+                        parts = self._graph.disjointPartitions(c)
+                        self._components[i] = parts[0]
+                        self._components.extend(parts[1:])
+                    else:
+                        self._components.pop(i)
+                    break
 
         def _connectableAndCovered(self):
             """
                 Return True iff all pairs can be connected and
                 all open vertices can be reached by some pair.
             """
-            components = self._graph.disjointPartitions(self._openverts)
             covered = set()
             for v1, v2 in self._headpairs:
-                acis1 = self._adjacentComponentIndices(components, v1)
-                acis2 = self._adjacentComponentIndices(components, v2)
+                acis1 = self._adjacentComponentIndices(v1)
+                acis2 = self._adjacentComponentIndices(v2)
                 commonacis = acis1.intersection(acis2)
                 if not commonacis and not self._graph.adjacent(v1, v2):
                     return False
                 covered |= commonacis
-            return len(covered) == len(components)
+            return len(covered) == len(self._components)
 
-        def _adjacentComponentIndices(self, components, v):
+        def _adjacentComponentIndices(self, v):
             acis = set()
             adj = self._graph.adjacencies(v)
-            for ci, component in enumerate(components):
+            for ci, component in enumerate(self._components):
                 if component.intersection(adj):
                     acis.add(ci)
             return acis
@@ -214,10 +230,11 @@ class FlowGraphSolver(object):
             assert all(len(vp) == 2 for vp in endpointpairs)
             assert len(reduce(set.union, map(set, endpointpairs), set())) == \
                    2 * len(endpointpairs)
+            headpairs = [tuple(sorted(ep)) for ep in endpointpairs]
             openverts = set(graph.vertices)
             openverts -= set(v for vp in endpointpairs for v in vp)
-            headpairs = [tuple(sorted(ep)) for ep in endpointpairs]
-            return cls(graph, headpairs, openverts)
+            components = graph.disjointPartitions(openverts)
+            return cls(graph, headpairs, openverts, components)
 
         @staticmethod
         def recoverPaths(framestack):
