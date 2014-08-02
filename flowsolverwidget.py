@@ -32,8 +32,12 @@ class FlowSolverWidget(QWidget):
             self._solver = FlowBoardSolver(self._board)
 
     def run(self):
+        if self._solver.done:
+            return
         for _ in xrange(50):
             self._solver.run()
+        if self._solver.done:
+            self._solver.printStats()
         self.repaint()
 
     def paintEvent(self, event):

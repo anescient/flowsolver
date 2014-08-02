@@ -24,6 +24,9 @@ class FlowBoardSolver(object):
     def run(self):
         self._solver.run()
 
+    def printStats(self):
+        self._solver.printStats()
+
     def getFlows(self):
         for vflow in self._solver.getFlows():
             yield (self._keyAt(vflow[0]), \
@@ -309,6 +312,10 @@ class FlowGraphSolver(object):
             self._limit = 20000
 
         @property
+        def inserts(self):
+            return self._inserts
+
+        @property
         def hitRate(self):
             return 0 if self._hits == 0 else self._hits / float(self._finds)
 
@@ -367,9 +374,13 @@ class FlowGraphSolver(object):
                 if popframe.framesTaken > 0:
                     self._memo.insert(popframe)
 
+    def printStats(self):
         print "{0} visited".format(self._totalframes)
-        print "memo: {0:.2%} hit, {1:.2%} return".format(\
-            self._memo.hitRate, self._memo.returnRate)
+        memorates = ""
+        if self._memo.inserts > 0:
+            memorates = ", {0:.2%} hit, {1:.2%} return".format(\
+                self._memo.hitRate, self._memo.returnRate)
+        print "memo: {0} inserts".format(self._memo.inserts) + memorates
 
     def getFlows(self):
         return self.Frame.recoverPaths(self._stack)
