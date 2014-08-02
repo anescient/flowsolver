@@ -240,17 +240,22 @@ class FlowGraphSolver(object):
         def _possibleMoves(self):
             moves = {}  # vidx : set of vertices to move to
             for pairidx, (v1, v2) in enumerate(self._headpairs):
-                m1 = self._graph.adjacencies(v1, self._openverts)
-                m2 = self._graph.adjacencies(v2, self._openverts)
+                common = self._commoncomponents[pairidx]
+                if len(common) == 1:
+                    openverts = self._components[next(iter(common))]
+                else:
+                    openverts = set()
+                    for c in map(self._components.get, common):
+                        openverts |= c
+                m1 = self._graph.adjacencies(v1, openverts)
+                m2 = self._graph.adjacencies(v2, openverts)
                 if self._graph.adjacent(v1, v2):
                     m1.add(v2)
                     m2.add(v1)
-                if not m1 or not m2:
-                    raise self.DeadEnd()
+                assert m1 and m2
                 moves[2 * pairidx] = m1
                 moves[2 * pairidx + 1] = m2
-            if not moves:
-                raise self.DeadEnd()
+            assert moves
             return moves
 
         def _leafMoves(self, movesets):
