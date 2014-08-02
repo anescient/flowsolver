@@ -85,14 +85,14 @@ class FlowSolvingPopup(QDialog):
         status = QStatusBar()
         status.setSizeGripEnabled(False)
 
-        abort = QPushButton("cancel")
-        abort.clicked.connect(self._abortClicked)
-        status.addPermanentWidget(abort)
+        self._abortButton = QPushButton("close")
+        self._abortButton.clicked.connect(self._abortClicked)
+        status.addPermanentWidget(self._abortButton)
 
         self._messageLabel = QLabel("ready")
         status.addWidget(self._messageLabel)
-
         layout.addWidget(status)
+
         layout.setSizeConstraint(QLayout.SetFixedSize)
         self.setLayout(layout)
 
@@ -104,9 +104,11 @@ class FlowSolvingPopup(QDialog):
         if board.isValid():
             self._solverWidget.setBoard(board)
             self._setMessage("running")
+            self._abortButton.setText("cancel")
             self._startTime = datetime.now()
             self._timer.start(50)
         else:
+            self._solverWidget.setBoard(None)
             self._setMessage("board is not valid")
 
     def closeEvent(self, event):
@@ -132,8 +134,9 @@ class FlowSolvingPopup(QDialog):
     @pyqtSlot()
     def _timerTick(self):
         if self._solverWidget.doneSolving:
-            self._setMessage("finished after " + self._getTimerStr())
             self._timer.stop()
+            self._setMessage("finished after " + self._getTimerStr())
+            self._abortButton.setText("close")
         else:
             self._setMessage("running for " + self._getTimerStr())
             try:
