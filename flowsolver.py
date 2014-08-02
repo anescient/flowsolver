@@ -40,9 +40,6 @@ class FlowGraphSolver(object):
 
     class Frame(object):
 
-        class DeadEnd(Exception):
-            pass
-
         def __init__(self, graph, headpairs, \
                      openverts, components, commoncomponents):
             self._graph = graph
@@ -175,25 +172,21 @@ class FlowGraphSolver(object):
             if subcomps:
                 self._components.update(subcomps)
 
-        def _connectableAndCovered(self):
-            """
-                Return True iff all pairs can be connected and
-                all open vertices can be reached by some pair.
-            """
+        def heuristicUnsolvable(self):
+            # check that all pairs can be connected and
+            # all open vertices can be reached by some pair
             covered = set()
             for common, (v1, v2) in izip(self._commoncomponents, \
                                          self._headpairs):
                 if not common and not self._graph.adjacent(v1, v2):
-                    return False
+                    return True
                 covered |= common
-            return len(covered) == len(self._components)
+            if len(covered) != len(self._components):
+                return True
 
-        def _hasDeadEnd(self):
-            """
-                Returns True iff any open vertex is adjacent only to
-                one other open vertex or path head.
-            """
-            if self._moveapplied:
+            # check if any open vertex is adjacent only to
+            # one other open vertex or one path head
+            if self._moveapplied:  # assume parent frames have been checked
                 checkverts = self._graph.adjacencies(self._moveapplied[0]) | \
                              self._graph.adjacencies(self._moveapplied[1])
                 checkverts &= self._openverts
@@ -209,21 +202,13 @@ class FlowGraphSolver(object):
 
         def takeNextFrame(self):
             if self._framegen is None:
-                try:
-                    self._framegen = self._nextFrames()
-                except self.DeadEnd:
-                    self._framegen = iter([])
+                self._framegen = self._nextFrames()
             frame = next(self._framegen, None)
             if frame:
                 self._framestaken += 1
             return frame
 
         def _nextFrames(self):
-            if not self._connectableAndCovered():
-                raise self.DeadEnd()
-            if self._hasDeadEnd():
-                raise self.DeadEnd()
-
             movesets = self._possibleMoves()
             best = None
             for vidx, moves in movesets.iteritems():
@@ -256,7 +241,6 @@ class FlowGraphSolver(object):
                 assert m1 and m2
                 moves[2 * pairidx] = m1
                 moves[2 * pairidx + 1] = m2
-            assert moves
             return moves
 
         def _leafMoves(self, movesets):
@@ -287,7 +271,6 @@ class FlowGraphSolver(object):
             openverts -= set(v for vp in endpointpairs for v in vp)
             components = dict(enumerate(graph.disjointPartitions(openverts)))
             commoncomponents = []
-            covered = set()
             for v1, v2 in headpairs:
                 adj1 = graph.adjacencies(v1, openverts)
                 adj2 = graph.adjacencies(v2, openverts)
@@ -296,8 +279,6 @@ class FlowGraphSolver(object):
                     if adj1 & c and adj2 & c:
                         common.add(k)
                 commoncomponents.append(common)
-                covered |= common
-            assert len(covered) == len(components)
             return cls(graph, headpairs, \
                        openverts, components, commoncomponents)
 
@@ -371,6 +352,8 @@ class FlowGraphSolver(object):
             nextframe = self._stack[-1].takeNextFrame()
             if nextframe:
                 self._totalframes += 1
+                if nextframe.heuristicUnsolvable():
+                    continue
                 if self._memo.find(nextframe):
                     continue
                 self._stack.append(nextframe)
