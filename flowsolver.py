@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from itertools import islice, chain
+from itertools import islice, chain, izip
 from gridgraph import GraphOntoRectangularGrid
 
 
@@ -43,11 +43,13 @@ class FlowGraphSolver(object):
         class DeadEnd(Exception):
             pass
 
-        def __init__(self, graph, headpairs, openverts, components):
+        def __init__(self, graph, headpairs, \
+                     openverts, components, commoncomponents):
             self._graph = graph
             self._headpairs = headpairs
             self._openverts = openverts
             self._components = components
+            self._commoncomponents = commoncomponents
             self._framegen = None
             self._framestaken = 0
             self._coverstate = None
@@ -82,7 +84,7 @@ class FlowGraphSolver(object):
         def copy(self, move=None):
             frame = self.__class__(\
                 self._graph, self._headpairs, \
-                self._openverts, self._components)
+                self._openverts, self._components, self._commoncomponents)
             if move:
                 frame.applyMove(*move)
             return frame
@@ -95,31 +97,82 @@ class FlowGraphSolver(object):
             head, other = oldpair[subidx], oldpair[1 - subidx]
             self._moveapplied = (head, to)
             self._headpairs = list(self._headpairs)
+            self._commoncomponents = list(self._commoncomponents)
             if to == other:
                 self._headpairs.pop(pairidx)
+                self._commoncomponents.pop(pairidx)
             else:
                 self._headpairs[pairidx] = \
                     (to, other) if to < other else (other, to)
-                self._closeVertex(to)
+                self._closeVertex(to, pairidx)
 
-        def _closeVertex(self, v):
+        def _closeVertex(self, v, pairidx):
             self._openverts = self._openverts.copy()
             self._openverts.remove(v)
-            self._components = list(self._components)
-            for i, c in enumerate(self._components):
+            self._components = self._components.copy()
+            k_deleted = None
+            k_reduced = None
+            subcomps = None
+            for k, c in self._components.iteritems():
                 if v in c:
                     c = c.copy()
                     c.remove(v)
                     if c:
                         if self._graph.isSeparator(v, c):
-                            parts = self._graph.disjointPartitions(c)
-                            self._components[i] = parts[0]
-                            self._components.extend(parts[1:])
+                            newk = max(self._components) + 1
+                            del self._components[k]
+                            k_deleted = k
+                            subcomps = {}
+                            for newc in self._graph.disjointPartitions(c):
+                                subcomps[newk] = newc
+                                newk += 1
                         else:
-                            self._components[i] = c
+                            self._components[k] = c
+                            k_reduced = k
                     else:
-                        self._components.pop(i)
+                        del self._components[k]
+                        k_deleted = k
                     break
+
+            if k_reduced is not None:
+                assert k_deleted is None and subcomps is None
+                reduced = self._components[k_reduced]
+                for i, (v1, v2) in enumerate(self._headpairs):
+                    common = self._commoncomponents[i]
+                    if k_reduced in common:
+                        adj1 = self._graph.adjacencies(v1)
+                        adj2 = self._graph.adjacencies(v2)
+                        if not adj1 & reduced or not adj2 & reduced:
+                            common = common.copy()
+                            common.remove(k_reduced)
+                            self._commoncomponents[i] = common
+            else:
+                assert k_deleted is not None
+                for i, (v1, v2) in enumerate(self._headpairs):
+                    common = self._commoncomponents[i]
+                    if k_deleted in common:
+                        common = common.copy()
+                        common.remove(k_deleted)
+                        if subcomps:
+                            adj1 = self._graph.adjacencies(v1)
+                            adj2 = self._graph.adjacencies(v2)
+                            for k, c in subcomps.iteritems():
+                                if adj1 & c and adj2 & c:
+                                    common.add(k)
+                        self._commoncomponents[i] = common
+
+            if subcomps:
+                self._components.update(subcomps)
+
+            v1, v2 = self._headpairs[pairidx]
+            adj1 = self._graph.adjacencies(v1)
+            adj2 = self._graph.adjacencies(v2)
+            common = self._commoncomponents[pairidx].copy()
+            for k in self._commoncomponents[pairidx]:
+                c = self._components[k]
+                if not adj1 & c or not adj2 & c:
+                    common.remove(k)
+            self._commoncomponents[pairidx] = common
 
         def _connectableAndCovered(self):
             """
@@ -127,22 +180,12 @@ class FlowGraphSolver(object):
                 all open vertices can be reached by some pair.
             """
             covered = set()
-            for v1, v2 in self._headpairs:
-                acis1 = self._adjacentComponentIndices(v1)
-                acis2 = self._adjacentComponentIndices(v2)
-                commonacis = acis1.intersection(acis2)
-                if not commonacis and not self._graph.adjacent(v1, v2):
+            for common, (v1, v2) in izip(self._commoncomponents, \
+                                         self._headpairs):
+                if not common and not self._graph.adjacent(v1, v2):
                     return False
-                covered |= commonacis
+                covered |= common
             return len(covered) == len(self._components)
-
-        def _adjacentComponentIndices(self, v):
-            acis = set()
-            adj = self._graph.adjacencies(v)
-            for ci, component in enumerate(self._components):
-                if component.intersection(adj):
-                    acis.add(ci)
-            return acis
 
         def _hasDeadEnd(self):
             """
@@ -236,8 +279,21 @@ class FlowGraphSolver(object):
             headpairs = [tuple(sorted(ep)) for ep in endpointpairs]
             openverts = set(graph.vertices)
             openverts -= set(v for vp in endpointpairs for v in vp)
-            components = graph.disjointPartitions(openverts)
-            return cls(graph, headpairs, openverts, components)
+            components = dict(enumerate(graph.disjointPartitions(openverts)))
+            commoncomponents = []
+            covered = set()
+            for v1, v2 in headpairs:
+                adj1 = graph.adjacencies(v1, openverts)
+                adj2 = graph.adjacencies(v2, openverts)
+                common = set()
+                for k, c in components.iteritems():
+                    if adj1 & c and adj2 & c:
+                        common.add(k)
+                commoncomponents.append(common)
+                covered |= common
+            assert len(covered) == len(components)
+            return cls(graph, headpairs, \
+                       openverts, components, commoncomponents)
 
         @staticmethod
         def recoverPaths(framestack):
