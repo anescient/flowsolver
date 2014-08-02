@@ -104,9 +104,19 @@ class FlowGraphSolver(object):
             else:
                 self._headpairs[pairidx] = \
                     (to, other) if to < other else (other, to)
-                self._closeVertex(to, pairidx)
+                self._closeVertex(to)
 
-        def _closeVertex(self, v, pairidx):
+                toadj = self._graph.adjacencies(to)
+                common = None
+                for k in self._commoncomponents[pairidx]:
+                    if not toadj & self._components[k]:
+                        if common is None:
+                            common = self._commoncomponents[pairidx].copy()
+                        common.remove(k)
+                if common is not None:
+                    self._commoncomponents[pairidx] = common
+
+        def _closeVertex(self, v):
             self._openverts = self._openverts.copy()
             self._openverts.remove(v)
             self._components = self._components.copy()
@@ -142,7 +152,8 @@ class FlowGraphSolver(object):
                     if k_reduced in common:
                         adj1 = self._graph.adjacencies(v1)
                         adj2 = self._graph.adjacencies(v2)
-                        if not adj1 & reduced or not adj2 & reduced:
+                        if (v in adj1 and not adj1 & reduced) or \
+                           (v in adj2 and not adj2 & reduced):
                             common = common.copy()
                             common.remove(k_reduced)
                             self._commoncomponents[i] = common
@@ -163,16 +174,6 @@ class FlowGraphSolver(object):
 
             if subcomps:
                 self._components.update(subcomps)
-
-            v1, v2 = self._headpairs[pairidx]
-            adj1 = self._graph.adjacencies(v1)
-            adj2 = self._graph.adjacencies(v2)
-            common = self._commoncomponents[pairidx].copy()
-            for k in self._commoncomponents[pairidx]:
-                c = self._components[k]
-                if not adj1 & c or not adj2 & c:
-                    common.remove(k)
-            self._commoncomponents[pairidx] = common
 
         def _connectableAndCovered(self):
             """
