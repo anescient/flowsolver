@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from datetime import datetime
 from PyQt4.QtCore import Qt, QTimer, pyqtSlot
 from PyQt4.QtGui import QApplication, QMainWindow, QColor, QPushButton, \
     QDialog, QStatusBar, QLayout, QBoxLayout, QLabel, QFileDialog, QMenuBar
@@ -80,6 +79,7 @@ class FlowSolvingPopup(QDialog):
         layout.setMargin(0)
 
         self._solverWidget = FlowSolverWidget()
+        self._solverWidget.finished.connect(self._solverFinished)
         layout.addWidget(self._solverWidget)
 
         status = QStatusBar()
@@ -98,14 +98,12 @@ class FlowSolvingPopup(QDialog):
 
         self._timer = QTimer()
         self._timer.timeout.connect(self._timerTick)
-        self._startTime = None
 
     def runSolve(self, board):
         if board.isValid():
             self._solverWidget.setBoard(board)
             self._setMessage("running")
             self._abortButton.setText("cancel")
-            self._startTime = datetime.now()
             self._timer.start(50)
         else:
             self._solverWidget.setBoard(None)
@@ -119,7 +117,7 @@ class FlowSolvingPopup(QDialog):
         self._messageLabel.setText(msg)
 
     def _getTimerStr(self):
-        dt = datetime.now() - self._startTime
+        dt = self._solverWidget.timeElapsed
         dm = dt.seconds // 60
         ds = dt.seconds - dm * 60
         dh = dm // 60
@@ -127,23 +125,25 @@ class FlowSolvingPopup(QDialog):
         dh += dt.days * 24
         return "{0}:{1:02}:{2:02}".format(dh, dm, ds)
 
+    @pyqtSlot()
+    def _solverFinished(self):
+        self._timer.stop()
+        self._setMessage("finished after " + self._getTimerStr())
+        self._abortButton.setText("close")
+
     @pyqtSlot(bool)
     def _abortClicked(self, _):
         self.close()
 
     @pyqtSlot()
     def _timerTick(self):
-        if self._solverWidget.doneSolving:
+        self._setMessage("running for " + self._getTimerStr())
+        try:
+            self._solverWidget.run()
+        except:
+            self._setMessage("error")
             self._timer.stop()
-            self._setMessage("finished after " + self._getTimerStr())
-            self._abortButton.setText("close")
-        else:
-            self._setMessage("running for " + self._getTimerStr())
-            try:
-                self._solverWidget.run()
-            except:
-                self._timer.stop()
-                raise
+            raise
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-from PyQt4.QtCore import QPoint, QSize
+from datetime import datetime, timedelta
+from PyQt4.QtCore import QPoint, QSize, pyqtSignal
 from PyQt4.QtGui import QPainter, QWidget
 from flowboard import FlowBoardPainter
 from grid import SpacedGrid
@@ -8,6 +9,9 @@ from flowsolver import FlowBoardSolver
 
 
 class FlowSolverWidget(QWidget):
+
+    finished = pyqtSignal()
+
     def __init__(self):
         super(FlowSolverWidget, self).__init__()
         self._size = 500
@@ -15,12 +19,20 @@ class FlowSolverWidget(QWidget):
         self._board = None
         self._grid = None
         self._solver = None
+        self._startTime = None
+        self._endTime = None
 
     @property
-    def doneSolving(self):
-        return self._solver.done
+    def timeElapsed(self):
+        if self._startTime is None:
+            return timedelta(0)
+        if self._endTime is None:
+            return datetime.now() - self._startTime
+        return self._endTime - self._startTime
 
     def setBoard(self, board):
+        self._startTime = None
+        self._endTime = None
         if board is None:
             self._board = None
             self._grid = None
@@ -34,9 +46,13 @@ class FlowSolverWidget(QWidget):
     def run(self):
         if self._solver.done:
             return
+        if self._startTime is None:
+            self._startTime = datetime.now()
         for _ in xrange(50):
             self._solver.run()
         if self._solver.done:
+            self._endTime = datetime.now()
+            self.finished.emit()
             self._solver.printStats()
         self.repaint()
 
