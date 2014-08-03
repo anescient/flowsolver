@@ -21,8 +21,8 @@ class FlowBoardSolver(object):
     def done(self):
         return self._solver.done
 
-    def run(self):
-        self._solver.run()
+    def run(self, limit=None):
+        return self._solver.run(limit)
 
     def printStats(self):
         self._solver.printStats()
@@ -351,9 +351,9 @@ class FlowGraphSolver(object):
     def done(self):
         return not self._stack or self._stack[-1].isSolved()
 
-    def run(self):
+    def run(self, limit=None):
         if self.done:
-            return
+            return True
         newtop = False
         while self._stack:
             nextframe = self._stack[-1].takeNextFrame()
@@ -368,11 +368,14 @@ class FlowGraphSolver(object):
                     break
                 newtop = True
             else:
-                if newtop:
-                    return
+                if newtop and limit is not None:
+                    limit -= 1
+                    if limit <= 0:
+                        return False
                 popframe = self._stack.pop()
                 if popframe.framesTaken > 0:
                     self._memo.insert(popframe)
+        return True
 
     def printStats(self):
         print "{0} visited".format(self._totalframes)

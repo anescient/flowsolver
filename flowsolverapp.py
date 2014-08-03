@@ -104,13 +104,15 @@ class FlowSolvingPopup(QDialog):
             self._solverWidget.setBoard(board)
             self._setMessage("running")
             self._abortButton.setText("cancel")
-            self._timer.start(50)
+            self._timer.start(100)
+            self._solverWidget.run()
         else:
             self._solverWidget.setBoard(None)
             self._setMessage("board is not valid")
 
     def closeEvent(self, event):
         self._timer.stop()
+        self._solverWidget.stop()
         super(FlowSolvingPopup, self).closeEvent(event)
 
     def _setMessage(self, msg):
@@ -138,12 +140,7 @@ class FlowSolvingPopup(QDialog):
     @pyqtSlot()
     def _timerTick(self):
         self._setMessage("running for " + self._getTimerStr())
-        try:
-            self._solverWidget.run()
-        except:
-            self._setMessage("error")
-            self._timer.stop()
-            raise
+        self._solverWidget.repaint()
 
 
 if __name__ == '__main__':
