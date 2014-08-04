@@ -213,35 +213,42 @@ class FlowGraphSolver(object):
 
         def _nextFrames(self):
             movesets = self._possibleMoves()
-            best = None
-            for vidx, moves in movesets.iteritems():
-                if best is None or len(moves) < len(best[1]):
-                    best = (vidx, moves)
-                if len(moves) == 1:
+            msit = movesets.iteritems()
+            best = next(msit)
+            for vidx, moves in msit:
+                if len(best[1]) == 1:
                     break
+                if len(moves) < len(best[1]):
+                    best = (vidx, moves)
 
             if len(best[1]) > 1:
                 leafmoves = self._leafMoves(movesets)
                 if leafmoves:
                     return (self.copy(move) for move in leafmoves)
-            return (self.copy((best[0], to)) for to in best[1])
+
+            # this sort tends to lead to less convoluted paths in solution
+            vidx = best[0]
+            moves = sorted(best[1], \
+                key=lambda v: len(self._graph.adjacencies(v, self._openverts)))
+            return (self.copy((vidx, to)) for to in moves)
 
         def _possibleMoves(self):
             moves = {}  # vidx : set of vertices to move to
             for pairidx, (v1, v2) in enumerate(self._headpairs):
                 common = self._commoncomponents[pairidx]
-                if len(common) == 1:
-                    openverts = self._components[next(iter(common))]
+                if common:
+                    openverts = reduce(set.union, \
+                        map(self._components.get, common))
+                    m1 = self._graph.adjacencies(v1, openverts)
+                    m2 = self._graph.adjacencies(v2, openverts)
+                    if self._graph.adjacent(v1, v2):
+                        m1.add(v2)
+                        m2.add(v1)
+                    assert m1 and m2
                 else:
-                    openverts = set()
-                    for c in map(self._components.get, common):
-                        openverts |= c
-                m1 = self._graph.adjacencies(v1, openverts)
-                m2 = self._graph.adjacencies(v2, openverts)
-                if self._graph.adjacent(v1, v2):
-                    m1.add(v2)
-                    m2.add(v1)
-                assert m1 and m2
+                    assert self._graph.adjacent(v1, v2)
+                    m1 = set([v2])
+                    m2 = set([v1])
                 moves[2 * pairidx] = m1
                 moves[2 * pairidx + 1] = m2
             return moves
@@ -373,8 +380,9 @@ class FlowGraphSolver(object):
                     if limit <= 0:
                         return False
                 popframe = self._stack.pop()
-                if popframe.framesTaken > 0:
-                    self._memo.insert(popframe)
+                #if popframe.framesTaken > 0:
+                assert popframe.framesTaken > 0
+                self._memo.insert(popframe)
         return True
 
     def printStats(self):
@@ -384,6 +392,12 @@ class FlowGraphSolver(object):
             memorates = ", {0:.2%} hit, {1:.2%} return".format(\
                 self._memo.hitRate, self._memo.returnRate)
         print "memo: {0} inserts".format(self._memo.inserts) + memorates
+        flows = []
+        for f in self.getFlows():
+            if f[0] > f[-1]:
+                f.reverse()
+            flows.append(tuple(f))
+        print "solution", hex(abs(hash(frozenset(flows))))
 
     def getFlows(self):
         return self.Frame.recoverPaths(self._stack)
