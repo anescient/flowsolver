@@ -31,6 +31,10 @@ class FlowSolverWidget(QWidget):
             return datetime.now() - self._startTime
         return self._endTime - self._startTime
 
+    @property
+    def solved(self):
+        return False if self._solver is None else self._solver.solved
+
     def setBoard(self, board):
         self._startTime = None
         self._endTime = None

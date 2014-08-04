@@ -338,6 +338,10 @@ class FlowGraphSolver(object):
     def done(self):
         return not self._stack or self._stack[-1].isSolved()
 
+    @property
+    def solved(self):
+        return self._stack and self._stack[-1].isSolved()
+
     def step(self):
         if not self._stack:
             return False

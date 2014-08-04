@@ -17,6 +17,7 @@ class FlowSolverAppWindow(QMainWindow):
         self._editor = FlowBoardEditor()
         self._editor.toolbar.setFloatable(False)
         self._editor.toolbar.setMovable(False)
+        self._editor.boardChanged.connect(self._boardChanged)
         self.addToolBar(self._editor.toolbar)
         editorcontainer = QSquareWidgetContainer()
         editorcontainer.setMargin(20)
@@ -28,9 +29,10 @@ class FlowSolverAppWindow(QMainWindow):
         tb.setFloatable(False)
         tb.setMovable(False)
 
-        solve = QPushButton("solve")
-        solve.clicked.connect(self._solveClicked)
-        tb.addWidget(solve)
+        self._solveButton = QPushButton("solve")
+        self._solveButton.clicked.connect(self._solveClicked)
+        self._solveButton.setEnabled(self._editor.boardIsValid)
+        tb.addWidget(self._solveButton)
 
         mb = QMenuBar()
         filemenu = mb.addMenu("File")
@@ -68,6 +70,10 @@ class FlowSolverAppWindow(QMainWindow):
         filepath = QFileDialog.getSaveFileName(caption="save board")
         if filepath:
             self._editor.saveBoardFile(filepath)
+
+    @pyqtSlot(bool)
+    def _boardChanged(self, valid):
+        self._solveButton.setEnabled(valid)
 
 
 class FlowSolvingPopup(QDialog):
@@ -130,7 +136,10 @@ class FlowSolvingPopup(QDialog):
     @pyqtSlot()
     def _solverFinished(self):
         self._timer.stop()
-        self._setMessage("finished after " + self._getTimerStr())
+        msg = "finished after " + self._getTimerStr()
+        if not self._solverWidget.solved:
+            msg += ", no solution found"
+        self._setMessage(msg)
         self._abortButton.setText("close")
 
     @pyqtSlot(bool)

@@ -11,6 +11,9 @@ from flowboard import FlowBoard, FlowPalette, FlowBoardPainter
 
 
 class FlowBoardEditor(QWidget):
+
+    boardChanged = pyqtSignal(bool)
+
     def __init__(self):
         super(FlowBoardEditor, self).__init__()
         self.setMinimumSize(400, 400)
@@ -30,6 +33,10 @@ class FlowBoardEditor(QWidget):
     def selectedTool(self):
         return self._toolbar.selectedTool
 
+    @property
+    def boardIsValid(self):
+        return self._board.isValid()
+
     def newBoard(self, boardSize):
         self.setBoard(FlowBoard(boardSize))
         self._toolbar.selectFirstEndpointTool()
@@ -40,6 +47,7 @@ class FlowBoardEditor(QWidget):
         self._updateGrid()
         self._hoverCell = None
         self.repaint()
+        self.boardChanged.emit(self.boardIsValid)
 
     def getBoard(self):
         return deepcopy(self._board)
@@ -77,12 +85,14 @@ class FlowBoardEditor(QWidget):
             if tool.canApply(self._board, cell):
                 tool.applyAction(self._board, cell)
                 self.repaint()
+                self.boardChanged.emit(self.boardIsValid)
         elif button == Qt.RightButton:
             key = self._board.endpointKeyAt(cell)
             if key is not None:
                 self._board.clear(cell)
                 self._toolbar.selectEndpointTool(key)
                 self.repaint()
+                self.boardChanged.emit(self.boardIsValid)
 
     def _markCell(self, cell):
         if self._hoverCell != cell:
