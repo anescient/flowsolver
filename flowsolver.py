@@ -4,44 +4,9 @@ from itertools import islice, chain, izip
 from gridgraph import GraphOntoRectangularGrid
 
 
-class FlowBoardSolver(object):
-    def __init__(self, board):
-        self._gridgraph = GraphOntoRectangularGrid(board.size)
-        for xy in board.bridges:
-            self._gridgraph.addBridge(xy)
-        self._endpoints = []
-        for k, xy1, xy2 in board.endpointPairs:
-            self._endpoints.append((k,
-                                    self._gridgraph.singleVertexAt(xy1), \
-                                    self._gridgraph.singleVertexAt(xy2)))
-        self._solver = FlowGraphSolver(self._gridgraph.getGraphCopy(), \
-            [(v1, v2) for _, v1, v2 in self._endpoints])
-
-    @property
-    def done(self):
-        return self._solver.done
-
-    def run(self, limit=None):
-        return self._solver.run(limit)
-
-    def printStats(self):
-        self._solver.printStats()
-
-    def getFlows(self):
-        for vflow in self._solver.getFlows():
-            yield (self._keyAt(vflow[0]), \
-                   list(map(self._gridgraph.locationForVertex, vflow)))
-
-    def _keyAt(self, v):
-        for k, v1, v2 in self._endpoints:
-            if v1 == v or v2 == v:
-                return k
-        return None
-
-
 class FlowGraphSolver(object):
 
-    class Frame(object):
+    class _Frame(object):
 
         def __init__(self, graph, headpairs, \
                      openverts, components, commoncomponents):
@@ -310,7 +275,7 @@ class FlowGraphSolver(object):
                     paths.append(p2)
             return paths
 
-    class Memo(object):
+    class _Memo(object):
         def __init__(self):
             self._memo = {}
             self._inserts = 0
@@ -350,9 +315,9 @@ class FlowGraphSolver(object):
             self._memo = dict((k, self._memo[k]) for k in keep)
 
     def __init__(self, graph, endpointpairs):
-        self._stack = [self.Frame.initial(graph, endpointpairs)]
+        self._stack = [self._Frame.initial(graph, endpointpairs)]
         self._totalframes = 1
-        self._memo = self.Memo()
+        self._memo = self._Memo()
 
     @property
     def done(self):
@@ -393,11 +358,39 @@ class FlowGraphSolver(object):
                 self._memo.hitRate, self._memo.returnRate)
         print "memo: {0} inserts".format(self._memo.inserts) + memorates
         flows = []
-        for f in self.getFlows():
+        for f in self.__getFlows():
             if f[0] > f[-1]:
                 f.reverse()
             flows.append(tuple(f))
         print "solution", hex(abs(hash(frozenset(flows))))
 
     def getFlows(self):
-        return self.Frame.recoverPaths(self._stack)
+        return self._Frame.recoverPaths(self._stack)
+
+    __getFlows = getFlows
+
+
+class FlowBoardSolver(FlowGraphSolver):
+    def __init__(self, board):
+        self._gridgraph = GraphOntoRectangularGrid(board.size)
+        for xy in board.bridges:
+            self._gridgraph.addBridge(xy)
+        self._endpoints = []
+        for k, xy1, xy2 in board.endpointPairs:
+            self._endpoints.append((k,
+                                    self._gridgraph.singleVertexAt(xy1), \
+                                    self._gridgraph.singleVertexAt(xy2)))
+        super(FlowBoardSolver, self).__init__(\
+            self._gridgraph.getGraphCopy(), \
+            [(v1, v2) for _, v1, v2 in self._endpoints])
+
+    def getFlows(self):
+        for vflow in super(FlowBoardSolver, self).getFlows():
+            yield (self._keyAt(vflow[0]), \
+                   list(map(self._gridgraph.locationForVertex, vflow)))
+
+    def _keyAt(self, v):
+        for k, v1, v2 in self._endpoints:
+            if v1 == v or v2 == v:
+                return k
+        return None
