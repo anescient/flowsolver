@@ -15,8 +15,7 @@ class FlowGraphSolver(object):
             self._openverts = openverts
             self._components = components
             self._commoncomponents = commoncomponents
-            self._framegen = None
-            self._framestaken = 0
+            self._nextframes = None
             self._coverstate = None
             self._moveapplied = None
 
@@ -29,8 +28,10 @@ class FlowGraphSolver(object):
             return iter(self._headpairs)
 
         @property
-        def framesTaken(self):
-            return self._framestaken
+        def hasNext(self):
+            if self._nextframes is None:
+                self._generateNextFrames()
+            return len(self._nextframes) > 0
 
         @property
         def coverState(self):
@@ -169,14 +170,15 @@ class FlowGraphSolver(object):
             return False
 
         def takeNextFrame(self):
-            if self._framegen is None:
-                self._framegen = self._nextFrames()
-            frame = next(self._framegen, None)
-            if frame:
-                self._framestaken += 1
-            return frame
+            if self._nextframes is None:
+                self._generateNextFrames()
+            return self._nextframes.pop(0) if self._nextframes else None
 
-        def _nextFrames(self):
+        def _generateNextFrames(self):
+            assert self._nextframes is None
+            if not self._headpairs:
+                self._nextframes = []
+                return
             movesets = self._possibleMoves()
             msit = movesets.iteritems()
             best = next(msit)
@@ -189,13 +191,14 @@ class FlowGraphSolver(object):
             if len(best[1]) > 1:
                 leafmoves = self._leafMoves(movesets)
                 if leafmoves:
-                    return (self.copy(move) for move in leafmoves)
+                    self._nextframes = [self.copy(move) for move in leafmoves]
+                    return
 
             # this sort tends to lead to less convoluted paths in solution
             vidx = best[0]
             moves = sorted(best[1], \
                 key=lambda v: len(self._graph.adjacencies(v, self._openverts)))
-            return (self.copy((vidx, to)) for to in moves)
+            self._nextframes = [self.copy((vidx, to)) for to in moves]
 
         def _possibleMoves(self):
             moves = {}  # vidx : set of vertices to move to
@@ -323,31 +326,41 @@ class FlowGraphSolver(object):
     def done(self):
         return not self._stack or self._stack[-1].isSolved()
 
+    def step(self):
+        if not self._stack:
+            return False
+        while self._stack[-1].hasNext:
+            nextframe = self._stack[-1].takeNextFrame()
+            self._totalframes += 1
+            if nextframe.heuristicUnsolvable():
+                continue
+            if self._memo.find(nextframe):
+                continue
+            self._stack.append(nextframe)
+            return True
+        return False
+
+    def stepBack(self):
+        if not self._stack:
+            return False
+        if self._stack[-1].hasNext:
+            return False
+        self._memo.insert(self._stack.pop())
+
     def run(self, limit=None):
         if self.done:
             return True
-        newtop = False
         while self._stack:
-            nextframe = self._stack[-1].takeNextFrame()
-            if nextframe:
-                self._totalframes += 1
-                if nextframe.heuristicUnsolvable():
-                    continue
-                if self._memo.find(nextframe):
-                    continue
-                self._stack.append(nextframe)
-                if nextframe.isSolved():
-                    break
-                newtop = True
-            else:
-                if newtop and limit is not None:
-                    limit -= 1
-                    if limit <= 0:
-                        return False
-                popframe = self._stack.pop()
-                #if popframe.framesTaken > 0:
-                assert popframe.framesTaken > 0
-                self._memo.insert(popframe)
+            while self.step():
+                pass
+            if self._stack[-1].isSolved():
+                return True
+            if limit is not None:
+                limit -= 1
+                if limit <= 0:
+                    return False
+            while self.stepBack():
+                pass
         return True
 
     def printStats(self):
