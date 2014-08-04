@@ -67,6 +67,9 @@ class FlowBoard(object):
         self.clear(cell)
         self._bridges.add(cell)
 
+    def hasBridgeAt(self, cell):
+        return cell in self._bridges
+
     def clear(self, cell):
         assert self._includesCell(cell)
         for k, l in self._endpoints.iteritems():

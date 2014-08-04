@@ -87,12 +87,20 @@ class FlowBoardEditor(QWidget):
                 self.repaint()
                 self.boardChanged.emit(self.boardIsValid)
         elif button == Qt.RightButton:
-            key = self._board.endpointKeyAt(cell)
-            if key is not None:
+            if self._takeToolFromCell(cell):
                 self._board.clear(cell)
-                self._toolbar.selectEndpointTool(key)
                 self.repaint()
                 self.boardChanged.emit(self.boardIsValid)
+
+    def _takeToolFromCell(self, cell):
+        if self._board.hasBridgeAt(cell):
+            self._toolbar.selectBridgeTool()
+            return True
+        key = self._board.endpointKeyAt(cell)
+        if key is not None:
+            self._toolbar.selectEndpointTool(key)
+            return True
+        return False
 
     def _markCell(self, cell):
         if self._hoverCell != cell:
@@ -277,10 +285,10 @@ class FlowToolChooser(QWidget):
         self._group.addButton(b)
         layout.addWidget(b, 0, 0)
 
-        b = FlowToolButton(FlowToolBridge())
-        b.setToolTip("bridge")
-        self._group.addButton(b)
-        layout.addWidget(b, 1, 0)
+        self._bridgeToolButton = FlowToolButton(FlowToolBridge())
+        self._bridgeToolButton.setToolTip("bridge")
+        self._group.addButton(self._bridgeToolButton)
+        layout.addWidget(self._bridgeToolButton, 1, 0)
 
         self.setLayout(layout)
 
@@ -302,6 +310,9 @@ class FlowToolChooser(QWidget):
                 button.setSelected(True)
                 return
         raise ValueError("no such tool")
+
+    def selectBridgeTool(self):
+        self._bridgeToolButton.setSelected(True)
 
     @pyqtSlot(int, FlowBoard)
     def _endpointToolApplied(self, endpointKey, board):
@@ -361,6 +372,9 @@ class FlowBoardEditorToolBar(QToolBar):
 
     def selectEndpointTool(self, key):
         self._toolchooser.selectEndpointTool(key)
+
+    def selectBridgeTool(self):
+        self._toolchooser.selectBridgeTool()
 
     @pyqtSlot(int)
     def _sizelistChanged(self, _):
