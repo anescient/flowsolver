@@ -50,6 +50,7 @@ class FlowSolverWidget(QWidget):
 
     def run(self):
         if self._solver.done:
+            self.finished.emit()
             return
         self._run = True
         self._startTime = datetime.now()

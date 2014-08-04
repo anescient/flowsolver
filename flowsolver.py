@@ -331,6 +331,8 @@ class FlowGraphSolver(object):
 
     def __init__(self, graph, endpointpairs):
         self._stack = [self._Frame.initial(graph, endpointpairs)]
+        if self._stack[-1].heuristicUnsolvable():
+            self._stack = []
         self._totalframes = 1
         self._memo = self._Memo()
 
