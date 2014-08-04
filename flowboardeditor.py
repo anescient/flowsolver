@@ -12,7 +12,7 @@ from flowboard import FlowBoard, FlowPalette, FlowBoardPainter
 
 class FlowBoardEditor(QWidget):
 
-    boardChanged = pyqtSignal(bool)
+    boardChanged = pyqtSignal(bool)  # argument: board is valid
 
     def __init__(self):
         super(FlowBoardEditor, self).__init__()
@@ -180,7 +180,7 @@ class FlowToolClear(FlowTool):
 
 class FlowToolEndpoint(FlowTool):
 
-    applied = pyqtSignal(int, FlowBoard)
+    applied = pyqtSignal(int, FlowBoard)  # arguments: key, board modified
 
     def __init__(self, key):
         super(FlowToolEndpoint, self).__init__()
@@ -319,9 +319,10 @@ class FlowToolChooser(QWidget):
         assert isinstance(self.selectedTool, FlowToolEndpoint)
         assert endpointKey == self.selectedTool.endpointKey
         if board.hasCompleteEndpoints(endpointKey):
-            i = self._endpointButtons.index(self._group.checkedButton())
-            if i < len(self._endpointButtons) - 1:
-                self._endpointButtons[i + 1].setSelected(True)
+            for button in self._endpointButtons:
+                if not board.hasCompleteEndpoints(button.tool.endpointKey):
+                    button.setSelected(True)
+                    break
 
 
 class FlowBoardEditorToolBar(QToolBar):
@@ -330,6 +331,8 @@ class FlowBoardEditorToolBar(QToolBar):
 
     def __init__(self):
         super(FlowBoardEditorToolBar, self).__init__()
+        self.setSizePolicy(\
+            QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum))
 
         boardbox = QBoxLayout(QBoxLayout.TopToBottom)
         boardbox.setSpacing(2)
