@@ -31,10 +31,9 @@ class FlowBoard(object):
         return iter(self._bridges)
 
     def isValid(self):
-        keys = self._endpoints.keys()
-        if not keys:
+        if not self._endpoints:
             return False
-        if not all(self.hasCompleteEndpoints(k) for k in keys):
+        if not all(self.hasCompleteEndpoints(k) for k in self._endpoints):
             return False
         if not all(self.isInnerCell(cell) for cell in self._bridges):
             return False
@@ -55,6 +54,13 @@ class FlowBoard(object):
             l.pop(0)
             assert len(l) == 2
         self._endpoints[key] = l
+
+    def endpointKeyAt(self, cell):
+        assert self._includesCell(cell)
+        for k, l in self._endpoints.iteritems():
+            if cell in l:
+                return k
+        return None
 
     def setBridge(self, cell):
         assert self.isInnerCell(cell)

@@ -61,22 +61,28 @@ class FlowBoardEditor(QWidget):
         QPainter(self).drawImage(QPoint(0, 0), self._renderBoard())
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            cell = self._grid.findCell(event.pos())
-            if cell:
-                self._cellClicked(cell)
-                return
+        cell = self._grid.findCell(event.pos())
+        if cell:
+            self._cellClicked(cell, event.button())
+            return
         super(FlowBoardEditor, self).mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         super(FlowBoardEditor, self).mouseMoveEvent(event)
         self._markCell(self._grid.findCell(event.pos()))
 
-    def _cellClicked(self, cell):
-        tool = self.selectedTool
-        if tool.canApply(self._board, cell):
-            tool.applyAction(self._board, cell)
-            self.repaint()
+    def _cellClicked(self, cell, button):
+        if button == Qt.LeftButton:
+            tool = self.selectedTool
+            if tool.canApply(self._board, cell):
+                tool.applyAction(self._board, cell)
+                self.repaint()
+        elif button == Qt.RightButton:
+            key = self._board.endpointKeyAt(cell)
+            if key is not None:
+                self._board.clear(cell)
+                self._toolbar.selectEndpointTool(key)
+                self.repaint()
 
     def _markCell(self, cell):
         if self._hoverCell != cell:
@@ -240,8 +246,7 @@ class FlowToolChooser(QWidget):
         layout.setMargin(4)
         layout.setAlignment(Qt.AlignCenter)
 
-        endpointTools = \
-            [FlowToolEndpoint(k) for k in sorted(FlowPalette.keys())]
+        endpointTools = [FlowToolEndpoint(k) for k in sorted(FlowPalette)]
         self._endpointButtons = []
         row = 0
         col = 1
@@ -280,6 +285,13 @@ class FlowToolChooser(QWidget):
 
     def selectFirstEndpointTool(self):
         self._endpointButtons[0].setSelected(True)
+
+    def selectEndpointTool(self, key):
+        for button in self._endpointButtons:
+            if button.tool.endpointKey == key:
+                button.setSelected(True)
+                return
+        raise ValueError("no such tool")
 
     @pyqtSlot(int, FlowBoard)
     def _endpointToolApplied(self, endpointKey, board):
@@ -337,6 +349,8 @@ class FlowBoardEditorToolBar(QToolBar):
     def selectFirstEndpointTool(self):
         self._toolchooser.selectFirstEndpointTool()
 
+    def selectEndpointTool(self, key):
+        self._toolchooser.selectEndpointTool(key)
 
     @pyqtSlot(int)
     def _sizelistChanged(self, _):
