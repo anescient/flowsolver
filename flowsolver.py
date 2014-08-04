@@ -16,6 +16,7 @@ class FlowGraphSolver(object):
             self._components = components
             self._commoncomponents = commoncomponents
             self._nextframes = None
+            self._aborted = False
             self._coverstate = None
             self._moveapplied = None
 
@@ -29,9 +30,15 @@ class FlowGraphSolver(object):
 
         @property
         def hasNext(self):
+            if self.aborted:
+                return False
             if self._nextframes is None:
                 self._generateNextFrames()
             return len(self._nextframes) > 0
+
+        @property
+        def aborted(self):
+            return self._aborted
 
         @property
         def coverState(self):
@@ -170,9 +177,14 @@ class FlowGraphSolver(object):
             return False
 
         def takeNextFrame(self):
+            assert not self.aborted
             if self._nextframes is None:
                 self._generateNextFrames()
-            return self._nextframes.pop(0) if self._nextframes else None
+            return self._nextframes.pop(0)
+
+        def abort(self):
+            assert self._nextframes is None
+            self._aborted = True
 
         def _generateNextFrames(self):
             assert self._nextframes is None
@@ -330,13 +342,12 @@ class FlowGraphSolver(object):
         if not self._stack:
             return False
         while self._stack[-1].hasNext:
-            nextframe = self._stack[-1].takeNextFrame()
+            top = self._stack[-1].takeNextFrame()
+            self._stack.append(top)
             self._totalframes += 1
-            if nextframe.heuristicUnsolvable():
-                continue
-            if self._memo.find(nextframe):
-                continue
-            self._stack.append(nextframe)
+            if top.heuristicUnsolvable() or self._memo.find(top):
+                top.abort()
+                return False
             return True
         return False
 
@@ -345,7 +356,10 @@ class FlowGraphSolver(object):
             return False
         if self._stack[-1].hasNext:
             return False
-        self._memo.insert(self._stack.pop())
+        popped = self._stack.pop()
+        if not popped.aborted:
+            self._memo.insert(popped)
+        return True
 
     def run(self, limit=None):
         if self.done:
