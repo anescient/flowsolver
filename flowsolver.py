@@ -388,12 +388,13 @@ class FlowGraphSolver(object):
             memorates = ", {0:.2%} hit, {1:.2%} return".format(\
                 self._memo.hitRate, self._memo.returnRate)
         print "memo: {0} inserts".format(self._memo.inserts) + memorates
-        flows = []
-        for f in self.__getFlows():
-            if f[0] > f[-1]:
-                f.reverse()
-            flows.append(tuple(f))
-        print "solution", hex(abs(hash(frozenset(flows))))
+        if self.solved:
+            flows = []
+            for f in self.__getFlows():
+                if f[0] > f[-1]:
+                    f.reverse()
+                flows.append(tuple(f))
+            print "solution", hex(abs(hash(frozenset(flows))))
 
     def getFlows(self):
         return self._Frame.recoverPaths(self._stack)
@@ -404,8 +405,29 @@ class FlowGraphSolver(object):
 class FlowBoardSolver(FlowGraphSolver):
     def __init__(self, board):
         self._gridgraph = GraphOntoRectangularGrid(board.size)
-        for xy in board.bridges:
-            self._gridgraph.addBridge(xy)
+
+        graph = self._gridgraph.graph
+        for x, y in board.bridges:
+            v = self._gridgraph.singleVertexAt((x, y))
+
+            x_adj = graph.adjacencies(v).intersection(\
+                self._gridgraph.verticesAt((x - 1, y)).union(\
+                self._gridgraph.verticesAt((x + 1, y))))
+            y_adj = graph.adjacencies(v).intersection(\
+                self._gridgraph.verticesAt((x, y - 1)).union(\
+                self._gridgraph.verticesAt((x, y + 1))))
+            assert len(x_adj) == 2 and len(y_adj) == 2
+
+            xpass = self._gridgraph.pushVertex((x, y))
+            self._gridgraph.addEdge(x_adj.pop(), xpass)
+            self._gridgraph.addEdge(x_adj.pop(), xpass)
+
+            ypass = self._gridgraph.pushVertex((x, y))
+            self._gridgraph.addEdge(y_adj.pop(), ypass)
+            self._gridgraph.addEdge(y_adj.pop(), ypass)
+
+            self._gridgraph.removeVertex(v)
+
         self._vertexKey = {}
         endpointpairs = []
         for k, (xy1, xy2) in board.endpointPairs:
