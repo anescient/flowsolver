@@ -2,7 +2,7 @@
 
 import pickle
 from copy import deepcopy
-from PyQt4.QtCore import Qt, QPoint, QSize, pyqtSignal, pyqtSlot
+from PyQt4.QtCore import Qt, QPoint, QSize, QObject, pyqtSignal, pyqtSlot
 from PyQt4.QtGui import QPainter, QWidget, QToolBar, QComboBox, QButtonGroup, \
     QPushButton, QCheckBox, QGridLayout, QBoxLayout, QSizePolicy, \
     QColor, QPen, QImage
@@ -76,10 +76,7 @@ class FlowBoardEditor(QWidget):
         tool = self.selectedTool
         if tool.canApply(self._board, cell):
             tool.applyAction(self._board, cell)
-            if isinstance(tool, FlowToolEndpoint):
-                if self._board.hasCompleteEndpoints(tool.endpointKey):
-                    self.toolbar.selectNextEndpointTool()
-        self.repaint()
+            self.repaint()
 
     def _markCell(self, cell):
         if self._hoverCell != cell:
@@ -111,8 +108,9 @@ class FlowBoardEditor(QWidget):
 ############################ cell tools
 
 
-class FlowTool(object):
+class FlowTool(QObject):
     def __init__(self):
+        super(FlowTool, self).__init__()
         self._icon = None
 
     def getIcon(self, size):
@@ -121,7 +119,7 @@ class FlowTool(object):
         return self._icon
 
     def canApply(self, board, cell):
-        return True
+        raise NotImplementedError()
 
     def applyAction(self, board, cell):
         raise NotImplementedError()
@@ -142,6 +140,9 @@ class FlowToolClear(FlowTool):
     def __init__(self):
         super(FlowToolClear, self).__init__()
 
+    def canApply(self, board, cell):
+        return True
+
     def applyAction(self, board, cell):
         board.clear(cell)
 
@@ -154,6 +155,9 @@ class FlowToolClear(FlowTool):
 
 
 class FlowToolEndpoint(FlowTool):
+
+    applied = pyqtSignal(int, FlowBoard)
+
     def __init__(self, key):
         super(FlowToolEndpoint, self).__init__()
         self._key = key
@@ -162,8 +166,12 @@ class FlowToolEndpoint(FlowTool):
     def endpointKey(self):
         return self._key
 
+    def canApply(self, board, cell):
+        return True
+
     def applyAction(self, board, cell):
         board.setEndpoint(cell, self.endpointKey)
+        self.applied.emit(self.endpointKey, board)
 
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
@@ -238,6 +246,7 @@ class FlowToolChooser(QWidget):
         row = 0
         col = 1
         for tool in endpointTools:
+            tool.applied.connect(self._endpointToolApplied)
             b = FlowToolButton(tool)
             self._endpointButtons.append(b)
             self._group.addButton(b)
@@ -272,10 +281,12 @@ class FlowToolChooser(QWidget):
     def selectFirstEndpointTool(self):
         self._endpointButtons[0].setSelected(True)
 
-    def selectNextEndpointTool(self):
-        b = self._group.checkedButton()
-        if isinstance(b.tool, FlowToolEndpoint):
-            i = self._endpointButtons.index(b)
+    @pyqtSlot(int, FlowBoard)
+    def _endpointToolApplied(self, endpointKey, board):
+        assert isinstance(self.selectedTool, FlowToolEndpoint)
+        assert endpointKey == self.selectedTool.endpointKey
+        if board.hasCompleteEndpoints(endpointKey):
+            i = self._endpointButtons.index(self._group.checkedButton())
             if i < len(self._endpointButtons) - 1:
                 self._endpointButtons[i + 1].setSelected(True)
 
@@ -326,8 +337,6 @@ class FlowBoardEditorToolBar(QToolBar):
     def selectFirstEndpointTool(self):
         self._toolchooser.selectFirstEndpointTool()
 
-    def selectNextEndpointTool(self):
-        self._toolchooser.selectNextEndpointTool()
 
     @pyqtSlot(int)
     def _sizelistChanged(self, _):
