@@ -23,13 +23,12 @@ class FlowBoard(object):
     @property
     def endpointPairs(self):
         for k, l in self._endpoints.iteritems():
-            if len(l) == 2:
-                yield (k, l[0], l[1])
+            assert self.hasCompleteEndpoints(k)
+            yield (k, tuple(l))
 
     @property
     def bridges(self):
-        for cell in self._bridges:
-            yield cell
+        return iter(self._bridges)
 
     def isValid(self):
         keys = self._endpoints.keys()
@@ -139,22 +138,19 @@ class FlowBoardPainter(object):
         QPainter(self._img).fillRect(r, self._highlightcolor)
 
     def drawFlow(self, key, cells):
-        if len(cells) < 2:
-            return
+        assert len(cells) > 1
         ptr = QPainter(self._img)
         linew = int(self._grid.minDimension * FlowBoardPainter.flowwidth)
         ptr.setPen(QPen(FlowPalette[key], linew, \
             cap=Qt.RoundCap, join=Qt.RoundJoin))
-        ptr.drawLines(self._flowLines(cells))
+        ptr.drawLines(list(self._flowLines(cells)))
 
     def _flowLines(self, cells):
         assert len(cells) > 1
         cells = FlowBoardPainter._simplifyFlow(cells)
-        lines = []
         for start, end in zip(cells[:-1], cells[1:]):
-            lines.append(QLine(self._grid.cellCenter(start), \
-                               self._grid.cellCenter(end)))
-        return lines
+            yield QLine(self._grid.cellCenter(start), \
+                        self._grid.cellCenter(end))
 
     @staticmethod
     def drawEndpoint(ptr, rect, key):
@@ -179,7 +175,7 @@ class FlowBoardPainter(object):
             return cells
         simple = cells[:2]
         for cell in cells[2:]:
-            a, b, c = simple[-2], simple[-1], cell
+            (a, b), c = simple[-2:], cell
             colinear = (a[0] == b[0] and b[0] == c[0]) or \
                        (a[1] == b[1] and b[1] == c[1])
             if colinear:

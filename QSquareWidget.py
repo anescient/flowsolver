@@ -20,8 +20,6 @@ class QCenteredSquareItemLayout(QLayout):
     def addWidget(self, widget):
         self.addItem(QWidgetItem(widget))
 
-    #def takeAt(self, index):
-
     def itemAt(self, index):
         return self._item if index == 0 else None
 

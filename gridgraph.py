@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from copy import deepcopy
 from graph import SimpleGraph
 
 
@@ -36,9 +35,9 @@ class GraphOntoRectangularGrid(object):
     def height(self):
         return self._height
 
-    def getGraphCopy(self):
-        """Return a copy of the current state of the graph."""
-        return deepcopy(self._graph)
+    @property
+    def graph(self):
+        return self._graph.asReadOnly()
 
     def verticesAt(self, xy):
         """Get the set of any/all vertices mapped to location."""

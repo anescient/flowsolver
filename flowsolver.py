@@ -402,22 +402,18 @@ class FlowBoardSolver(FlowGraphSolver):
         self._gridgraph = GraphOntoRectangularGrid(board.size)
         for xy in board.bridges:
             self._gridgraph.addBridge(xy)
-        self._endpoints = []
-        for k, xy1, xy2 in board.endpointPairs:
-            self._endpoints.append((k,
-                                    self._gridgraph.singleVertexAt(xy1), \
-                                    self._gridgraph.singleVertexAt(xy2)))
+        self._vertexKey = {}
+        endpointpairs = []
+        for k, (xy1, xy2) in board.endpointPairs:
+            v1 = self._gridgraph.singleVertexAt(xy1)
+            v2 = self._gridgraph.singleVertexAt(xy2)
+            self._vertexKey[v1] = k
+            self._vertexKey[v2] = k
+            endpointpairs.append((v1, v2))
         super(FlowBoardSolver, self).__init__(\
-            self._gridgraph.getGraphCopy(), \
-            [(v1, v2) for _, v1, v2 in self._endpoints])
+            self._gridgraph.graph, endpointpairs)
 
     def getFlows(self):
         for vflow in super(FlowBoardSolver, self).getFlows():
-            yield (self._keyAt(vflow[0]), \
+            yield (self._vertexKey[vflow[0]], \
                    list(map(self._gridgraph.locationForVertex, vflow)))
-
-    def _keyAt(self, v):
-        for k, v1, v2 in self._endpoints:
-            if v1 == v or v2 == v:
-                return k
-        return None

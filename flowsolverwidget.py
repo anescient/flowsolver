@@ -68,7 +68,8 @@ class FlowSolverWidget(QWidget):
             fbp.drawEndpoints(self._board.endpoints)
             fbp.drawBridges(self._board.bridges)
             for key, cells in self._solver.getFlows():
-                fbp.drawFlow(key, cells)
+                if len(cells) > 1:
+                    fbp.drawFlow(key, cells)
             QPainter(self).drawImage(QPoint(0, 0), fbp.image)
 
     def sizeHint(self):

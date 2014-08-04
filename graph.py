@@ -1,41 +1,21 @@
 #!/usr/bin/env python
 
 
-class SimpleGraph(object):
-    def __init__(self):
-        self._nextVertex = 0  # incrementing index
+class QueryableSimpleGraph(object):
+    def __init__(self, edgeSets=None):
         self._edges = {}  # vertex : set of connected vertices (doubly-linked)
                           # keys are vertex collection (may have empty values)
+        if edgeSets:
+            for v, adj in edgeSets.iteritems():
+                assert v not in adj
+                for u in adj:
+                    assert u in edgeSets
+                    assert v in edgeSets[u]
+            self._edges = edgeSets
 
     @property
     def vertices(self):
         return iter(self._edges)
-
-    def pushVertex(self):
-        """Return new vertex id."""
-        v = self._nextVertex
-        self._nextVertex += 1
-        self._edges[v] = set()
-        return v
-
-    def removeVertex(self, v):
-        """Delete a vertex and any related edges."""
-        for adj in self._edges[v]:
-            self._edges[adj].remove(v)
-        del self._edges[v]
-
-    def addEdge(self, v1, v2):
-        """Connect v1 and v2. Error if loop or already connected."""
-        assert v1 != v2
-        assert v2 not in self._edges[v1]
-        self._edges[v1].add(v2)
-        self._edges[v2].add(v1)
-
-    def removeEdge(self, v1, v2):
-        """Disconnect v1 and v2. Error if not connected."""
-        assert v1 != v2
-        self._edges[v1].remove(v2)
-        self._edges[v2].remove(v1)
 
     def adjacent(self, v1, v2):
         """Return True iff v1 and v2 share an edge."""
@@ -48,7 +28,7 @@ class SimpleGraph(object):
             Return set of vertices adjacent to v. Never includes v.
         """
         if vertices is None:
-            return self._edges[v]
+            return self._edges[v].copy()
         else:
             return self._edges[v].intersection(vertices)
 
@@ -166,8 +146,44 @@ class SimpleGraph(object):
         return partitions
 
 
+class SimpleGraph(QueryableSimpleGraph):
+    def __init__(self):
+        super(SimpleGraph, self).__init__()
+
+    def asReadOnly(self):
+        return QueryableSimpleGraph(self._edges)
+
+    def pushVertex(self):
+        """Return new vertex id."""
+        v = max(self._edges) + 1 if self._edges else 0
+        self._edges[v] = set()
+        return v
+
+    def removeVertex(self, v):
+        """Delete a vertex and any related edges."""
+        for adj in self._edges[v]:
+            self._edges[adj].remove(v)
+        del self._edges[v]
+
+    def addEdge(self, v1, v2):
+        """Connect v1 and v2. Error if loop or already connected."""
+        assert v1 != v2
+        assert v2 not in self._edges[v1]
+        self._edges[v1].add(v2)
+        self._edges[v2].add(v1)
+
+    def removeEdge(self, v1, v2):
+        """Disconnect v1 and v2. Error if not connected."""
+        assert v1 != v2
+        self._edges[v1].remove(v2)
+        self._edges[v2].remove(v1)
+
+
 def _test():
     g = SimpleGraph()
+    assert isinstance(g, QueryableSimpleGraph)
+    assert not isinstance(g.asReadOnly(), SimpleGraph)
+    assert isinstance(g.asReadOnly(), QueryableSimpleGraph)
     verts = []
     for i in xrange(10):
         verts.append(g.pushVertex())
@@ -200,6 +216,7 @@ def _test():
     g.addEdge(verts[0], verts[-1])
     assert not any(g.isSeparator(v) for v in verts)
     g.removeEdge(verts[0], verts[-1])
+    g.asReadOnly()
     parts = g.disjointPartitions(verts[:2] + verts[3:])
     assert len(parts) == 2
     assert len(parts[0].intersection(parts[1])) == 0

@@ -19,7 +19,7 @@ class FlowBoardEditor(QWidget):
         self._connectToolbar(self._toolbar)
         self._board = None
         self._grid = None
-        self._markedCell = None
+        self._hoverCell = None
         self.newBoard(self._toolbar.selectedSize)
 
     @property
@@ -38,7 +38,7 @@ class FlowBoardEditor(QWidget):
         self._toolbar.selectSize(board.size)
         self._board = board
         self._updateGrid()
-        self._markedCell = None
+        self._hoverCell = None
         self.repaint()
 
     def getBoard(self):
@@ -82,10 +82,9 @@ class FlowBoardEditor(QWidget):
         self.repaint()
 
     def _markCell(self, cell):
-        if self._markedCell == cell:
-            return
-        self._markedCell = cell
-        self.repaint()
+        if self._hoverCell != cell:
+            self._hoverCell = cell
+            self.repaint()
 
     def _updateGrid(self):
         self._grid = SpacedGrid(\
@@ -94,9 +93,9 @@ class FlowBoardEditor(QWidget):
     def _renderBoard(self):
         fbp = FlowBoardPainter(self._grid)
         fbp.drawGrid()
-        if self._markedCell:
-            if self.selectedTool.canApply(self._board, self._markedCell):
-                fbp.drawCellHighlight(self._markedCell)
+        if self._hoverCell:
+            if self.selectedTool.canApply(self._board, self._hoverCell):
+                fbp.drawCellHighlight(self._hoverCell)
         fbp.drawEndpoints(self._board.endpoints)
         fbp.drawBridges(self._board.bridges)
         return fbp.image
@@ -226,26 +225,28 @@ class FlowToolButton(QCheckBox):
 class FlowToolChooser(QWidget):
     def __init__(self):
         super(FlowToolChooser, self).__init__()
-        self._endpointTools = \
-            [FlowToolEndpoint(k) for k in sorted(FlowPalette.keys())]
-        self._endpointButtons = []
         self._group = QButtonGroup()
         self._group.setExclusive(True)
         layout = QGridLayout()
         layout.setSpacing(0)
         layout.setMargin(4)
         layout.setAlignment(Qt.AlignCenter)
+
+        endpointTools = \
+            [FlowToolEndpoint(k) for k in sorted(FlowPalette.keys())]
+        self._endpointButtons = []
         row = 0
         col = 1
-        for tool in self._endpointTools:
+        for tool in endpointTools:
             b = FlowToolButton(tool)
             self._endpointButtons.append(b)
             self._group.addButton(b)
             layout.addWidget(b, row, col)
             col += 1
-            if col > len(self._endpointTools) / 2:
+            if col > len(endpointTools) / 2:
                 row += 1
                 col = 1
+        self._endpointButtons[0].setSelected(True)
 
         b = FlowToolButton(FlowToolClear())
         b.setToolTip("clear")
@@ -258,7 +259,6 @@ class FlowToolChooser(QWidget):
         layout.addWidget(b, 1, 0)
 
         self.setLayout(layout)
-        self._endpointButtons[0].setSelected(True)
 
     @property
     def selectedTool(self):
