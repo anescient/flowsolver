@@ -142,8 +142,7 @@ class FlowBoardPainter(object):
         if len(cells) < 2:
             return
         ptr = QPainter(self._img)
-        linew = int(\
-            self._grid.cellRect(cells[0]).width() * FlowBoardPainter.flowwidth)
+        linew = int(self._grid.minDimension * FlowBoardPainter.flowwidth)
         ptr.setPen(QPen(FlowPalette[key], linew, \
             cap=Qt.RoundCap, join=Qt.RoundJoin))
         ptr.drawLines(self._flowLines(cells))

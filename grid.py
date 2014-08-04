@@ -17,6 +17,8 @@ class SpacedGrid(object):
             0, size.height(), rows, spacing))
         self._columns = list(SpacedGrid._divideRange(\
             0, size.width(), columns, spacing))
+        self._minheight = min(r[1] - r[0] for r in self._rows)
+        self._minwidth = min(c[1] - c[0] for c in self._columns)
 
     @property
     def size(self):
@@ -25,6 +27,10 @@ class SpacedGrid(object):
     @property
     def spacing(self):
         return self._spacing
+
+    @property
+    def minDimension(self):
+        return min(self._minheight, self._minwidth)
 
     def rowSpacings(self):
         return self._spacings(self._rows)
