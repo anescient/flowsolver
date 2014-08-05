@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
 from datetime import datetime, timedelta
-from PyQt4.QtCore import QCoreApplication, QPoint, QSize, pyqtSignal
-from PyQt4.QtGui import QPainter, QWidget
-from flowboard import FlowBoardPainter
-from grid import SpacedGrid
+from PyQt4.QtCore import QCoreApplication, QSize, pyqtSignal
+from PyQt4.QtGui import QWidget
+from flowpainter import SpacedGrid, FlowBoardPainter
 from flowsolver import FlowBoardSolver
 
 
@@ -67,15 +66,16 @@ class FlowSolverWidget(QWidget):
 
     def paintEvent(self, event):
         super(FlowSolverWidget, self).paintEvent(event)
+        ptr = FlowBoardPainter(self)
+        ptr.fillBackground()
         if self._board:
-            fbp = FlowBoardPainter(self._grid)
-            fbp.drawGrid()
-            fbp.drawBoardFeatures(self._board)
+            ptr.drawGrid(self._grid)
+            ptr.drawBoardFeatures(self._grid, self._board)
             if self._solver:
                 for key, cells in self._solver.getFlows():
                     if len(cells) > 1:
-                        fbp.drawFlow(key, cells)
-            QPainter(self).drawImage(QPoint(0, 0), fbp.image)
+                        ptr.drawFlow(self._grid, key, cells)
+        ptr.end()
 
     def sizeHint(self):
         return QSize(self._size, self._size)

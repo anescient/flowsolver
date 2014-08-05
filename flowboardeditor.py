@@ -2,12 +2,12 @@
 
 import pickle
 from copy import deepcopy
-from PyQt4.QtCore import Qt, QPoint, QSize, QObject, pyqtSignal, pyqtSlot
-from PyQt4.QtGui import QPainter, QWidget, QToolBar, QComboBox, QButtonGroup, \
+from PyQt4.QtCore import Qt, QSize, QObject, pyqtSignal, pyqtSlot
+from PyQt4.QtGui import QWidget, QToolBar, QComboBox, QButtonGroup, \
     QPushButton, QCheckBox, QGridLayout, QBoxLayout, QSizePolicy, \
     QColor, QPen, QImage
-from grid import SpacedGrid
-from flowboard import FlowBoard, FlowPalette, FlowBoardPainter
+from flowboard import FlowBoard
+from flowpainter import SpacedGrid, FlowPalette, FlowBoardPainter
 
 
 class FlowBoardEditor(QWidget):
@@ -68,7 +68,12 @@ class FlowBoardEditor(QWidget):
 
     def paintEvent(self, event):
         super(FlowBoardEditor, self).paintEvent(event)
-        QPainter(self).drawImage(QPoint(0, 0), self._renderBoard())
+        ptr = FlowBoardPainter(self)
+        ptr.drawGrid(self._grid)
+        if self._hoverCell:
+            if self.selectedTool.canApply(self._board, self._hoverCell):
+                ptr.drawCellHighlight(self._grid, self._hoverCell)
+        ptr.drawBoardFeatures(self._grid, self._board)
 
     def mousePressEvent(self, event):
         cell = self._grid.findCell(event.pos())
@@ -116,15 +121,6 @@ class FlowBoardEditor(QWidget):
         self._grid = SpacedGrid(\
             self._board.size, self._board.size, self.rect().size(), 2)
 
-    def _renderBoard(self):
-        fbp = FlowBoardPainter(self._grid)
-        fbp.drawGrid()
-        if self._hoverCell:
-            if self.selectedTool.canApply(self._board, self._hoverCell):
-                fbp.drawCellHighlight(self._hoverCell)
-        fbp.drawBoardFeatures(self._board)
-        return fbp.image
-
     def _connectToolbar(self, toolbar):
         toolbar.makeNewBoard.connect(self._makeNewBoard)
 
@@ -158,9 +154,9 @@ class FlowTool(QObject):
     @staticmethod
     def _emptyIcon(size):
         img = QImage(size, QImage.Format_ARGB32_Premultiplied)
-        ptr = QPainter(img)
-        ptr.setCompositionMode(QPainter.CompositionMode_Clear)
-        ptr.fillRect(img.rect(), FlowBoardPainter.bgcolor)
+        ptr = FlowBoardPainter(img)
+        ptr.fillBackground()
+        ptr.end()
         return img
 
 
@@ -176,9 +172,9 @@ class FlowToolClear(FlowTool):
 
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
-        ptr = QPainter(img)
-        ptr.setPen(QPen(FlowBoardPainter.gridcolor, 2, join=Qt.MiterJoin))
-        ptr.drawRect(img.rect().adjusted(1, 1, -1, -1))
+        ptr = FlowBoardPainter(img)
+        ptr.traceBound(img.rect())
+        ptr.end()
         return img
 
 
@@ -203,8 +199,9 @@ class FlowToolEndpoint(FlowTool):
 
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
-        ptr = QPainter(img)
-        FlowBoardPainter.drawEndpoint(ptr, img.rect(), self.endpointKey)
+        ptr = FlowBoardPainter(img)
+        ptr.drawEndpoint(img.rect(), self.endpointKey)
+        ptr.end()
         return img
 
 
@@ -220,7 +217,9 @@ class FlowToolBridge(FlowTool):
 
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
-        FlowBoardPainter.drawBridge(QPainter(img), img.rect())
+        ptr = FlowBoardPainter(img)
+        ptr.drawBridge(img.rect())
+        ptr.end()
         return img
 
 
@@ -236,7 +235,9 @@ class FlowToolBlock(FlowTool):
 
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
-        FlowBoardPainter.drawBlock(QPainter(img), img.rect())
+        ptr = FlowBoardPainter(img)
+        ptr.drawBlock(img.rect())
+        ptr.end()
         return img
 
 
@@ -265,13 +266,14 @@ class FlowToolButton(QCheckBox):
         return QSize(self._size, self._size)
 
     def paintEvent(self, event):
-        ptr = QPainter(self)
-        ptr.fillRect(self.rect(), FlowBoardPainter.bgcolor)
+        ptr = FlowBoardPainter(self)
+        ptr.fillBackground()
         if self.checkState() == Qt.Checked:
             ptr.setPen(QPen(QColor(255, 255, 255), 2, Qt.DotLine))
             ptr.drawRect(self.rect().adjusted(1, 1, -1, -1))
         iconrect = self.rect().adjusted(2, 2, -2, -2)
         ptr.drawImage(iconrect.topLeft(), self._tool.getIcon(iconrect.size()))
+        ptr.end()
 
 
 class FlowToolChooser(QWidget):
@@ -323,7 +325,9 @@ class FlowToolChooser(QWidget):
         return b.tool if b else None
 
     def paintEvent(self, event):
-        QPainter(self).fillRect(self.rect(), FlowBoardPainter.bgcolor)
+        ptr = FlowBoardPainter(self)
+        ptr.fillBackground()
+        ptr.end()
         super(FlowToolChooser, self).paintEvent(event)
 
     def selectFirstOpenEndpoint(self, board):

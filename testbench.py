@@ -4,9 +4,9 @@ print "loading testbench"
 
 from PyQt4.QtCore import QPoint, QSize, pyqtSlot
 from PyQt4.QtGui import QPushButton, QDialog, QStatusBar, QLayout, \
-    QBoxLayout, QWidget, QPainter
-from grid import SpacedGrid
-from flowboard import FlowBoardPainter, FlowBoardGraph
+    QBoxLayout, QWidget
+from flowboard import FlowBoardGraph
+from flowpainter import SpacedGrid, FlowBoardPainter
 
 
 class TestWidget(QWidget):
@@ -29,20 +29,21 @@ class TestWidget(QWidget):
 
     def paintEvent(self, event):
         super(TestWidget, self).paintEvent(event)
-        fbp = FlowBoardPainter(self._grid)
-        fbp.drawGrid()
-        fbp.drawBoardFeatures(self._board)
+        ptr = FlowBoardPainter(self)
+        ptr.fillBackground()
+        ptr.drawGrid(self._grid)
+        ptr.drawBoardFeatures(self._grid, self._board)
         if self._parts:
             k = 1
             for p in self._parts:
-                self._markVerts(fbp.image, k, p)
+                self._markVerts(ptr, k, p)
                 k += 1
-        QPainter(self).drawImage(QPoint(0, 0), fbp.image)
+        ptr.end()
 
     def sizeHint(self):
         return QSize(self._size, self._size)
 
-    def _markVerts(self, img, key, verts):
+    def _markVerts(self, ptr, key, verts):
         div = 4
         r_mark = self._grid.cellRect((0, 0))
         marksize = self._grid.minDimension // div
@@ -53,7 +54,7 @@ class TestWidget(QWidget):
         offset = QPoint(col * marksize, row * marksize)
         for cell in self._graph.verticesToCells(verts):
             r_mark.moveTopLeft(self._grid.cellRect(cell).topLeft() + offset)
-            FlowBoardPainter.drawEndpoint(QPainter(img), r_mark, key)
+            ptr.drawEndpoint(r_mark, key)
 
 
 class TestPopup(QDialog):
