@@ -408,23 +408,26 @@ class FlowBoardSolver(FlowGraphSolver):
     def __init__(self, board):
         self._gridgraph = GraphOntoRectangularGrid(board.size)
 
-        graph = self._gridgraph.graph
-        for x, y in board.bridges:
-            v = self._gridgraph.singleVertexAt((x, y))
+        for xy in board.blockages:
+            self._gridgraph.removeVertexAt(xy)
 
-            x_adj = graph.adjacencies(v).intersection(\
+        for xy in board.bridges:
+            x, y = xy
+            v = self._gridgraph.singleVertexAt(xy)
+
+            x_adj = self._gridgraph.adjacenciesAt(xy).intersection(\
                 self._gridgraph.verticesAt((x - 1, y)).union(\
                 self._gridgraph.verticesAt((x + 1, y))))
-            y_adj = graph.adjacencies(v).intersection(\
+            y_adj = self._gridgraph.adjacenciesAt(xy).intersection(\
                 self._gridgraph.verticesAt((x, y - 1)).union(\
                 self._gridgraph.verticesAt((x, y + 1))))
             assert len(x_adj) == 2 and len(y_adj) == 2
 
-            xpass = self._gridgraph.pushVertex((x, y))
+            xpass = self._gridgraph.pushVertex(xy)
             self._gridgraph.addEdge(x_adj.pop(), xpass)
             self._gridgraph.addEdge(x_adj.pop(), xpass)
 
-            ypass = self._gridgraph.pushVertex((x, y))
+            ypass = self._gridgraph.pushVertex(xy)
             self._gridgraph.addEdge(y_adj.pop(), ypass)
             self._gridgraph.addEdge(y_adj.pop(), ypass)
 

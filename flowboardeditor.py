@@ -31,7 +31,7 @@ class FlowBoardEditor(QWidget):
 
     @property
     def selectedTool(self):
-        return self._toolbar.selectedTool
+        return self.toolbar.tools.selected
 
     @property
     def boardIsValid(self):
@@ -39,10 +39,10 @@ class FlowBoardEditor(QWidget):
 
     def newBoard(self, boardSize):
         self.setBoard(FlowBoard(boardSize))
-        self._toolbar.selectFirstEndpointTool()
+        self.toolbar.tools.selectFirstOpenEndpoint(self._board)
 
     def setBoard(self, board):
-        self._toolbar.selectSize(board.size)
+        self.toolbar.selectSize(board.size)
         self._board = board
         self._updateGrid()
         self._hoverCell = None
@@ -53,8 +53,10 @@ class FlowBoardEditor(QWidget):
         return deepcopy(self._board)
 
     def loadBoardFile(self, filepath):
-        board = pickle.load(open(filepath, 'rb'))
-        if isinstance(board, FlowBoard):
+        loadboard = pickle.load(open(filepath, 'rb'))
+        if isinstance(loadboard, FlowBoard):
+            board = FlowBoard(loadboard.size)
+            board.__dict__.update(loadboard.__dict__)
             self.setBoard(board)
 
     def saveBoardFile(self, filepath):
@@ -94,11 +96,14 @@ class FlowBoardEditor(QWidget):
 
     def _takeToolFromCell(self, cell):
         if self._board.hasBridgeAt(cell):
-            self._toolbar.selectBridgeTool()
+            self.toolbar.tools.selectBridge()
+            return True
+        if self._board.hasBlockageAt(cell):
+            self.toolbar.tools.selectBlock()
             return True
         key = self._board.endpointKeyAt(cell)
         if key is not None:
-            self._toolbar.selectEndpointTool(key)
+            self.toolbar.tools.selectEndpoint(key)
             return True
         return False
 
@@ -117,8 +122,7 @@ class FlowBoardEditor(QWidget):
         if self._hoverCell:
             if self.selectedTool.canApply(self._board, self._hoverCell):
                 fbp.drawCellHighlight(self._hoverCell)
-        fbp.drawEndpoints(self._board.endpoints)
-        fbp.drawBridges(self._board.bridges)
+        fbp.drawBoardFeatures(self._board)
         return fbp.image
 
     def _connectToolbar(self, toolbar):
@@ -156,7 +160,7 @@ class FlowTool(QObject):
         img = QImage(size, QImage.Format_ARGB32_Premultiplied)
         ptr = QPainter(img)
         ptr.setCompositionMode(QPainter.CompositionMode_Clear)
-        ptr.fillRect(img.rect(), QColor(0, 0, 0, 0))
+        ptr.fillRect(img.rect(), FlowBoardPainter.bgcolor)
         return img
 
 
@@ -209,7 +213,7 @@ class FlowToolBridge(FlowTool):
         super(FlowToolBridge, self).__init__()
 
     def canApply(self, board, cell):
-        return board.isInnerCell(cell)
+        return board.bridgeValidAt(cell)
 
     def applyAction(self, board, cell):
         board.setBridge(cell)
@@ -217,6 +221,22 @@ class FlowToolBridge(FlowTool):
     def _makeIcon(self, size):
         img = FlowTool._emptyIcon(size)
         FlowBoardPainter.drawBridge(QPainter(img), img.rect())
+        return img
+
+
+class FlowToolBlock(FlowTool):
+    def __init__(self):
+        super(FlowToolBlock, self).__init__()
+
+    def canApply(self, board, cell):
+        return board.blockageValidAt(cell)
+
+    def applyAction(self, board, cell):
+        board.setBlockage(cell)
+
+    def _makeIcon(self, size):
+        img = FlowTool._emptyIcon(size)
+        FlowBoardPainter.drawBlock(QPainter(img), img.rect())
         return img
 
 
@@ -267,33 +287,38 @@ class FlowToolChooser(QWidget):
         endpointTools = [FlowToolEndpoint(k) for k in sorted(FlowPalette)]
         self._endpointButtons = []
         row = 0
-        col = 1
+        col = 2
         for tool in endpointTools:
             tool.applied.connect(self._endpointToolApplied)
-            b = FlowToolButton(tool)
-            self._endpointButtons.append(b)
-            self._group.addButton(b)
-            layout.addWidget(b, row, col)
+            toolButton = FlowToolButton(tool)
+            self._endpointButtons.append(toolButton)
+            self._group.addButton(toolButton)
+            layout.addWidget(toolButton, row, col)
             col += 1
-            if col > len(endpointTools) / 2:
+            if col - 1 > len(endpointTools) / 2:
                 row += 1
-                col = 1
-        self._endpointButtons[0].setSelected(True)
+                col = 2
 
-        b = FlowToolButton(FlowToolClear())
-        b.setToolTip("clear")
-        self._group.addButton(b)
-        layout.addWidget(b, 0, 0)
+        clearToolButton = FlowToolButton(FlowToolClear())
+        clearToolButton.setToolTip("clear")
+        self._group.addButton(clearToolButton)
+        layout.addWidget(clearToolButton, 0, 0)
+        clearToolButton.setSelected(True)
 
         self._bridgeToolButton = FlowToolButton(FlowToolBridge())
         self._bridgeToolButton.setToolTip("bridge")
         self._group.addButton(self._bridgeToolButton)
-        layout.addWidget(self._bridgeToolButton, 1, 0)
+        layout.addWidget(self._bridgeToolButton, 1, 1)
+
+        self._blockToolButton = FlowToolButton(FlowToolBlock())
+        self._blockToolButton.setToolTip("blockage")
+        self._group.addButton(self._blockToolButton)
+        layout.addWidget(self._blockToolButton, 1, 0)
 
         self.setLayout(layout)
 
     @property
-    def selectedTool(self):
+    def selected(self):
         b = self._group.checkedButton()
         return b.tool if b else None
 
@@ -301,28 +326,31 @@ class FlowToolChooser(QWidget):
         QPainter(self).fillRect(self.rect(), FlowBoardPainter.bgcolor)
         super(FlowToolChooser, self).paintEvent(event)
 
-    def selectFirstEndpointTool(self):
-        self._endpointButtons[0].setSelected(True)
+    def selectFirstOpenEndpoint(self, board):
+        for button in self._endpointButtons:
+            if not board.hasCompleteEndpoints(button.tool.endpointKey):
+                button.setSelected(True)
+                break
 
-    def selectEndpointTool(self, key):
+    def selectEndpoint(self, key):
         for button in self._endpointButtons:
             if button.tool.endpointKey == key:
                 button.setSelected(True)
                 return
         raise ValueError("no such tool")
 
-    def selectBridgeTool(self):
+    def selectBridge(self):
         self._bridgeToolButton.setSelected(True)
+
+    def selectBlock(self):
+        self._blockToolButton.setSelected(True)
 
     @pyqtSlot(int, FlowBoard)
     def _endpointToolApplied(self, endpointKey, board):
-        assert isinstance(self.selectedTool, FlowToolEndpoint)
-        assert endpointKey == self.selectedTool.endpointKey
+        assert isinstance(self.selected, FlowToolEndpoint)
+        assert endpointKey == self.selected.endpointKey
         if board.hasCompleteEndpoints(endpointKey):
-            for button in self._endpointButtons:
-                if not board.hasCompleteEndpoints(button.tool.endpointKey):
-                    button.setSelected(True)
-                    break
+            self.selectFirstOpenEndpoint(board)
 
 
 class FlowBoardEditorToolBar(QToolBar):
@@ -367,17 +395,8 @@ class FlowBoardEditorToolBar(QToolBar):
                 self._sizelist.setCurrentIndex(i)
 
     @property
-    def selectedTool(self):
-        return self._toolchooser.selectedTool
-
-    def selectFirstEndpointTool(self):
-        self._toolchooser.selectFirstEndpointTool()
-
-    def selectEndpointTool(self, key):
-        self._toolchooser.selectEndpointTool(key)
-
-    def selectBridgeTool(self):
-        self._toolchooser.selectBridgeTool()
+    def tools(self):
+        return self._toolchooser
 
     @pyqtSlot(int)
     def _sizelistChanged(self, _):

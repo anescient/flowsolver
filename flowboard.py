@@ -9,6 +9,7 @@ class FlowBoard(object):
         self._size = size or 7
         self._endpoints = {}  # key: list (length 1 or 2) of 2-tuples
         self._bridges = set()  # 2-tuples
+        self._blockages = set()  # 2-tuples
 
     @property
     def size(self):
@@ -30,18 +31,20 @@ class FlowBoard(object):
     def bridges(self):
         return iter(self._bridges)
 
+    @property
+    def blockages(self):
+        return iter(self._blockages)
+
     def isValid(self):
         if not self._endpoints:
             return False
         if not all(self.hasCompleteEndpoints(k) for k in self._endpoints):
             return False
-        if not all(self.isInnerCell(cell) for cell in self._bridges):
+        if not all(self.bridgeValidAt(cell) for cell in self._bridges):
+            return False
+        if not all(self.blockageValidAt(cell) for cell in self._blockages):
             return False
         return True
-
-    def isInnerCell(self, cell):
-        return cell[0] > 0 and cell[0] < self._size - 1 and \
-               cell[1] > 0 and cell[1] < self._size - 1
 
     def hasCompleteEndpoints(self, key):
         return key in self._endpoints and len(self._endpoints[key]) == 2
@@ -62,13 +65,27 @@ class FlowBoard(object):
                 return k
         return None
 
+    def bridgeValidAt(self, cell):
+        return len(self._adjacentUnblockedCells(cell)) == 4
+
     def setBridge(self, cell):
-        assert self.isInnerCell(cell)
+        assert self.bridgeValidAt(cell)
         self.clear(cell)
         self._bridges.add(cell)
 
     def hasBridgeAt(self, cell):
         return cell in self._bridges
+
+    def blockageValidAt(self, cell):
+        return not self._bridges.intersection(self._adjacentCells(cell))
+
+    def setBlockage(self, cell):
+        assert self.blockageValidAt(cell)
+        self.clear(cell)
+        self._blockages.add(cell)
+
+    def hasBlockageAt(self, cell):
+        return cell in self._blockages
 
     def clear(self, cell):
         assert self._includesCell(cell)
@@ -79,10 +96,29 @@ class FlowBoard(object):
                     del self._endpoints[k]
                 break
         self._bridges.discard(cell)
+        self._blockages.discard(cell)
 
     def _includesCell(self, cell):
         return cell[0] >= 0 and cell[0] < self._size and \
                cell[1] >= 0 and cell[1] < self._size
+
+    def _adjacentUnblockedCells(self, cell):
+        return set(self._adjacentCells(cell)) - self._blockages
+
+    def _adjacentCells(self, cell):
+        if cell[0] > 0:
+            yield (cell[0] - 1, cell[1])
+        if cell[0] < self._size - 1:
+            yield (cell[0] + 1, cell[1])
+        if cell[1] > 0:
+            yield (cell[0], cell[1] - 1)
+        if cell[1] < self._size - 1:
+            yield (cell[0], cell[1] + 1)
+
+    @staticmethod
+    def _adjacent(cell1, cell2):
+        return (abs(cell1[0] - cell2[0]) == 1) != \
+               (abs(cell1[1] - cell2[1]) == 1)
 
 
 FlowPalette = {
@@ -129,18 +165,17 @@ class FlowBoardPainter(object):
         for y in self._grid.rowSpacingsCenters():
             ptr.drawLine(0, y, w, y)
 
-    def drawEndpoints(self, endpoints):
+    def drawBoardFeatures(self, board):
         ptr = QPainter(self._img)
-        for cell, key in endpoints:
+        for cell, key in board.endpoints:
             rect = self._grid.cellRect(cell)
             margin = rect.width() // 8
             rect = rect.adjusted(margin, margin, -margin, -margin)
             FlowBoardPainter.drawEndpoint(ptr, rect, key)
-
-    def drawBridges(self, bridges):
-        ptr = QPainter(self._img)
-        for cell in bridges:
+        for cell in board.bridges:
             FlowBoardPainter.drawBridge(ptr, self._grid.cellRect(cell))
+        for cell in board.blockages:
+            FlowBoardPainter.drawBlock(ptr, self._grid.cellRect(cell))
 
     def drawCellHighlight(self, cell):
         r = self._grid.cellRect(cell)
@@ -149,7 +184,7 @@ class FlowBoardPainter(object):
     def drawFlow(self, key, cells):
         assert len(cells) > 1
         ptr = QPainter(self._img)
-        linew = int(self._grid.minDimension * FlowBoardPainter.flowwidth)
+        linew = int(self._grid.minDimension * self.flowwidth)
         ptr.setPen(QPen(FlowPalette[key], linew, \
             cap=Qt.RoundCap, join=Qt.RoundJoin))
         ptr.drawLines(list(self._flowLines(cells)))
@@ -170,13 +205,15 @@ class FlowBoardPainter(object):
         ptr.drawEllipse(rect)
         ptr.restore()
 
-    @staticmethod
-    def drawBridge(ptr, rect):
-        w = rect.width() * (1.0 - FlowBoardPainter.flowwidth) * 0.5
-        FlowBoardPainter._fillCorners(ptr, rect, w, \
-            FlowBoardPainter.gridcolor)
-        FlowBoardPainter._fillCorners(ptr, rect, w - 3, \
-            FlowBoardPainter.bgcolor)
+    @classmethod
+    def drawBridge(cls, ptr, rect):
+        w = rect.width() * (1.0 - cls.flowwidth) * 0.5
+        FlowBoardPainter._fillCorners(ptr, rect, w, cls.gridcolor)
+        FlowBoardPainter._fillCorners(ptr, rect, w - 3, cls.bgcolor)
+
+    @classmethod
+    def drawBlock(cls, ptr, rect):
+        ptr.fillRect(rect, cls.gridcolor)
 
     @staticmethod
     def _simplifyFlow(cells):

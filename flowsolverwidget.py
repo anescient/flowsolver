@@ -67,14 +67,13 @@ class FlowSolverWidget(QWidget):
     def paintEvent(self, event):
         super(FlowSolverWidget, self).paintEvent(event)
         if self._board:
-            assert self._grid and self._solver
             fbp = FlowBoardPainter(self._grid)
             fbp.drawGrid()
-            fbp.drawEndpoints(self._board.endpoints)
-            fbp.drawBridges(self._board.bridges)
-            for key, cells in self._solver.getFlows():
-                if len(cells) > 1:
-                    fbp.drawFlow(key, cells)
+            fbp.drawBoardFeatures(self._board)
+            if self._solver:
+                for key, cells in self._solver.getFlows():
+                    if len(cells) > 1:
+                        fbp.drawFlow(key, cells)
             QPainter(self).drawImage(QPoint(0, 0), fbp.image)
 
     def sizeHint(self):

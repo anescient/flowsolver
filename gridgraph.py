@@ -8,7 +8,6 @@ class GraphOntoRectangularGrid(object):
         Locations in the grid are tuples (x, y), 0-based.
         Each vertex maps to one grid location.
         It is possible for a grid location to map to multiple vertices.
-        All in-range locations map to at least one vertex.
     """
 
     def __init__(self, width, height=None):
@@ -47,9 +46,11 @@ class GraphOntoRectangularGrid(object):
         return v
 
     def removeVertex(self, v):
-        assert len(self.verticesAt(self.locationForVertex(v))) > 1
         self._graph.removeVertex(v)
         del self._locationMap[v]
+
+    def removeVertexAt(self, xy):
+        self.removeVertex(self.singleVertexAt(xy))
 
     def addEdge(self, v1, v2):
         self._graph.addEdge(v1, v2)
@@ -63,6 +64,9 @@ class GraphOntoRectangularGrid(object):
         v = self.verticesAt(xy)
         assert len(v) == 1
         return v.pop()
+
+    def adjacenciesAt(self, xy):
+        return self._graph.adjacencies(self.singleVertexAt(xy))
 
     def locationForVertex(self, v):
         return self._locationMap[v]
