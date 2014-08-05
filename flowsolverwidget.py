@@ -8,6 +8,38 @@ from grid import SpacedGrid
 from flowsolver import FlowBoardSolver
 
 
+class TestWidget(QWidget):
+    def __init__(self):
+        super(TestWidget, self).__init__()
+        self._size = 500
+        self.setFixedSize(self.sizeHint())
+        self._board = None
+        self._grid = None
+
+    def setBoard(self, board):
+        if board is None:
+            self._board = None
+            self._grid = None
+        else:
+            self._board = board
+            self._grid = SpacedGrid(\
+                self._board.size, self._board.size, self.rect().size(), 2)
+
+    def run(self):
+        self.repaint()
+
+    def paintEvent(self, event):
+        super(TestWidget, self).paintEvent(event)
+        if self._board:
+            fbp = FlowBoardPainter(self._grid)
+            fbp.drawGrid()
+            fbp.drawBoardFeatures(self._board)
+            QPainter(self).drawImage(QPoint(0, 0), fbp.image)
+
+    def sizeHint(self):
+        return QSize(self._size, self._size)
+
+
 class FlowSolverWidget(QWidget):
 
     finished = pyqtSignal()

@@ -2,10 +2,11 @@
 
 from PyQt4.QtCore import Qt, QTimer, pyqtSlot
 from PyQt4.QtGui import QApplication, QMainWindow, QColor, QPushButton, \
-    QDialog, QStatusBar, QLayout, QBoxLayout, QLabel, QFileDialog, QMenuBar
+    QDialog, QStatusBar, QLayout, QBoxLayout, QLabel, QFileDialog, QMenuBar, \
+    QWidget
 from QSquareWidget import QSquareWidgetContainer
 from flowboardeditor import FlowBoardEditor
-from flowsolverwidget import FlowSolverWidget
+from flowsolverwidget import FlowSolverWidget, TestWidget
 
 
 class FlowSolverAppWindow(QMainWindow):
@@ -32,7 +33,17 @@ class FlowSolverAppWindow(QMainWindow):
         self._solveButton = QPushButton("solve")
         self._solveButton.clicked.connect(self._solveClicked)
         self._solveButton.setEnabled(self._editor.boardIsValid)
-        tb.addWidget(self._solveButton)
+
+        testbutton = QPushButton("test")
+        testbutton.clicked.connect(self._testClicked)
+
+        actionbox = QBoxLayout(QBoxLayout.TopToBottom)
+        actionbox.setSpacing(2)
+        actionbox.addWidget(self._solveButton)
+        actionbox.addWidget(testbutton)
+        actionswidget = QWidget()
+        actionswidget.setLayout(actionbox)
+        tb.addWidget(actionswidget)
 
         mb = QMenuBar()
         filemenu = mb.addMenu("File")
@@ -42,6 +53,9 @@ class FlowSolverAppWindow(QMainWindow):
 
         self._solvepopup = FlowSolvingPopup(self)
         self._solvepopup.setModal(True)
+
+        self._testpopup = TestPopup(self)
+        self._testpopup.setModal(True)
 
     def dragEnterEvent(self, event):
         event.accept()
@@ -60,6 +74,11 @@ class FlowSolverAppWindow(QMainWindow):
         self._solvepopup.runSolve(self._editor.getBoard())
 
     @pyqtSlot(bool)
+    def _testClicked(self, _):
+        self._testpopup.show()
+        self._testpopup.setBoard(self._editor.getBoard())
+
+    @pyqtSlot(bool)
     def _openClicked(self, _):
         filepath = QFileDialog.getOpenFileName(caption="open board")
         if filepath:
@@ -74,6 +93,48 @@ class FlowSolverAppWindow(QMainWindow):
     @pyqtSlot(bool)
     def _boardChanged(self, valid):
         self._solveButton.setEnabled(valid)
+
+
+class TestPopup(QDialog):
+    def __init__(self, parent=None):
+        super(TestPopup, self).__init__(parent)
+
+        layout = QBoxLayout(QBoxLayout.TopToBottom)
+        layout.setSpacing(0)
+        layout.setMargin(0)
+
+        self._widget = TestWidget()
+        layout.addWidget(self._widget)
+
+        status = QStatusBar()
+        status.setSizeGripEnabled(False)
+
+        self._abortButton = QPushButton("close")
+        self._abortButton.clicked.connect(self._abortClicked)
+        status.addPermanentWidget(self._abortButton)
+
+        self._messageLabel = QLabel("ready")
+        status.addWidget(self._messageLabel)
+        layout.addWidget(status)
+
+        layout.setSizeConstraint(QLayout.SetFixedSize)
+        self.setLayout(layout)
+
+        self._board = None
+
+    def setBoard(self, board):
+        self._board = board
+        self._widget.setBoard(board)
+
+    def closeEvent(self, event):
+        super(TestPopup, self).closeEvent(event)
+
+    def _setMessage(self, msg):
+        self._messageLabel.setText(msg)
+
+    @pyqtSlot(bool)
+    def _abortClicked(self, _):
+        self.close()
 
 
 class FlowSolvingPopup(QDialog):
