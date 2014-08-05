@@ -226,6 +226,17 @@ class FlowBoardPainter(object):
         r = self._grid.cellRect(cell)
         QPainter(self._img).fillRect(r, self._highlightcolor)
 
+    def markCell(self, key, cell):
+        div = 4
+        r_mark = self._grid.cellRect(cell)
+        marksize = r_mark.width() // div
+        r_mark.setWidth(marksize)
+        r_mark.setHeight(marksize)
+        row = (key - 1) // div
+        col = (key - 1) % div
+        r_mark.translate(col * marksize, row * marksize)
+        FlowBoardPainter.drawEndpoint(QPainter(self._img), r_mark, key)
+
     def drawFlow(self, key, cells):
         assert len(cells) > 1
         ptr = QPainter(self._img)
