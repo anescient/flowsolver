@@ -2,20 +2,26 @@
 
 
 class QueryableSimpleGraph(object):
-    def __init__(self, edgeSets=None):
-        self._edges = {}  # vertex : set of connected vertices (doubly-linked)
-                          # keys are vertex collection (may have empty values)
-        if edgeSets:
-            for v, adj in edgeSets.iteritems():
-                assert v not in adj
-                for u in adj:
-                    assert u in edgeSets
-                    assert v in edgeSets[u]
-            self._edges = edgeSets
+    def __init__(self, edgeSets):
+        self._edges = edgeSets
+        # vertex : set of connected vertices (doubly-linked)
+        # keys are vertex collection (may have empty values)
+
+        for v, adj in edgeSets.iteritems():
+            assert v not in adj
+            for u in adj:
+                assert u in edgeSets
+                assert v in edgeSets[u]
 
     @property
     def vertices(self):
         return iter(self._edges)
+
+    def copyEdgeSets(self):
+        edgesets = self._edges.copy()
+        for v in edgesets:
+            edgesets[v] = edgesets[v].copy()
+        return edgesets
 
     def adjacent(self, v1, v2):
         """Return True iff v1 and v2 share an edge."""
@@ -159,7 +165,7 @@ class QueryableSimpleGraph(object):
 
 class SimpleGraph(QueryableSimpleGraph):
     def __init__(self):
-        super(SimpleGraph, self).__init__()
+        super(SimpleGraph, self).__init__({})
 
     def asReadOnly(self):
         return QueryableSimpleGraph(self._edges)

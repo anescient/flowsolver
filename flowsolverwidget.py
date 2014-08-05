@@ -90,6 +90,7 @@ class FlowSolverWidget(QWidget):
             QCoreApplication.processEvents()
         self._endTime = datetime.now()
         self.finished.emit()
+        print
         self._solver.printStats()
         self.repaint()
 

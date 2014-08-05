@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from itertools import islice, chain, izip
-from gridgraph import GraphOntoRectangularGrid
+from flowboard import FlowBoardGraph
 
 
 class FlowGraphSolver(object):
@@ -411,45 +411,21 @@ class FlowGraphSolver(object):
 
 class FlowBoardSolver(FlowGraphSolver):
     def __init__(self, board):
-        self._gridgraph = GraphOntoRectangularGrid(board.size)
-
-        for xy in board.blockages:
-            self._gridgraph.removeVertexAt(xy)
-
-        for xy in board.bridges:
-            x, y = xy
-            v = self._gridgraph.singleVertexAt(xy)
-
-            x_adj = self._gridgraph.adjacenciesAt(xy).intersection(\
-                self._gridgraph.verticesAt((x - 1, y)).union(\
-                self._gridgraph.verticesAt((x + 1, y))))
-            y_adj = self._gridgraph.adjacenciesAt(xy).intersection(\
-                self._gridgraph.verticesAt((x, y - 1)).union(\
-                self._gridgraph.verticesAt((x, y + 1))))
-            assert len(x_adj) == 2 and len(y_adj) == 2
-
-            xpass = self._gridgraph.pushVertex(xy)
-            self._gridgraph.addEdge(x_adj.pop(), xpass)
-            self._gridgraph.addEdge(x_adj.pop(), xpass)
-
-            ypass = self._gridgraph.pushVertex(xy)
-            self._gridgraph.addEdge(y_adj.pop(), ypass)
-            self._gridgraph.addEdge(y_adj.pop(), ypass)
-
-            self._gridgraph.removeVertex(v)
+        assert board.isValid()
+        self._boardgraph = FlowBoardGraph(board)
 
         self._vertexKey = {}
         endpointpairs = []
         for k, (xy1, xy2) in board.endpointPairs:
-            v1 = self._gridgraph.singleVertexAt(xy1)
-            v2 = self._gridgraph.singleVertexAt(xy2)
+            v1 = self._boardgraph.cellToVertex(xy1)
+            v2 = self._boardgraph.cellToVertex(xy2)
             self._vertexKey[v1] = k
             self._vertexKey[v2] = k
             endpointpairs.append((v1, v2))
-        super(FlowBoardSolver, self).__init__(\
-            self._gridgraph.graph, endpointpairs)
+
+        super(FlowBoardSolver, self).__init__(self._boardgraph, endpointpairs)
 
     def getFlows(self):
         for vflow in super(FlowBoardSolver, self).getFlows():
             yield (self._vertexKey[vflow[0]], \
-                   list(map(self._gridgraph.locationForVertex, vflow)))
+                   self._boardgraph.verticesToCells(vflow))

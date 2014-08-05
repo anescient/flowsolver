@@ -2,6 +2,8 @@
 
 from PyQt4.QtCore import Qt, QLine, QRect
 from PyQt4.QtGui import QPainter, QImage, QColor, QPen
+from graph import QueryableSimpleGraph
+from gridgraph import GraphOntoRectangularGrid
 
 
 class FlowBoard(object):
@@ -119,6 +121,49 @@ class FlowBoard(object):
     def _adjacent(cell1, cell2):
         return (abs(cell1[0] - cell2[0]) == 1) != \
                (abs(cell1[1] - cell2[1]) == 1)
+
+
+class FlowBoardGraph(QueryableSimpleGraph):
+    def __init__(self, board):
+        gridgraph = GraphOntoRectangularGrid(board.size)
+
+        for xy in board.blockages:
+            gridgraph.removeVertexAt(xy)
+
+        for xy in board.bridges:
+            x, y = xy
+            v = gridgraph.singleVertexAt(xy)
+
+            x_adj = gridgraph.adjacenciesAt(xy).intersection(\
+                gridgraph.verticesAt((x - 1, y)).union(\
+                gridgraph.verticesAt((x + 1, y))))
+            y_adj = gridgraph.adjacenciesAt(xy).intersection(\
+                gridgraph.verticesAt((x, y - 1)).union(\
+                gridgraph.verticesAt((x, y + 1))))
+            assert len(x_adj) == 2 and len(y_adj) == 2
+
+            xpass = gridgraph.pushVertex(xy)
+            gridgraph.addEdge(x_adj.pop(), xpass)
+            gridgraph.addEdge(x_adj.pop(), xpass)
+
+            ypass = gridgraph.pushVertex(xy)
+            gridgraph.addEdge(y_adj.pop(), ypass)
+            gridgraph.addEdge(y_adj.pop(), ypass)
+
+            gridgraph.removeVertex(v)
+
+        self._cellToVertex = gridgraph.singleVertexAt
+        self._vertexToCell = gridgraph.locationForVertex
+        super(FlowBoardGraph, self).__init__(gridgraph.graph.copyEdgeSets())
+
+    def cellToVertex(self, cell):
+        return self._cellToVertex(cell)
+
+    def vertexToCell(self, v):
+        return self._vertexToCell(v)
+
+    def verticesToCells(self, vseq):
+        return list(map(self._vertexToCell, vseq))
 
 
 FlowPalette = {
