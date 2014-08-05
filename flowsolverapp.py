@@ -6,7 +6,8 @@ from PyQt4.QtGui import QApplication, QMainWindow, QColor, QPushButton, \
     QWidget
 from QSquareWidget import QSquareWidgetContainer
 from flowboardeditor import FlowBoardEditor
-from flowsolverwidget import FlowSolverWidget, TestWidget
+from flowsolverwidget import FlowSolverWidget
+from testbench import TestPopup
 
 
 class FlowSolverAppWindow(QMainWindow):
@@ -34,13 +35,9 @@ class FlowSolverAppWindow(QMainWindow):
         self._solveButton.clicked.connect(self._solveClicked)
         self._solveButton.setEnabled(self._editor.boardIsValid)
 
-        testbutton = QPushButton("test")
-        testbutton.clicked.connect(self._testClicked)
-
         actionbox = QBoxLayout(QBoxLayout.TopToBottom)
         actionbox.setSpacing(2)
         actionbox.addWidget(self._solveButton)
-        actionbox.addWidget(testbutton)
         actionswidget = QWidget()
         actionswidget.setLayout(actionbox)
         tb.addWidget(actionswidget)
@@ -56,6 +53,9 @@ class FlowSolverAppWindow(QMainWindow):
 
         self._testpopup = TestPopup(self)
         self._testpopup.setModal(True)
+        testbutton = QPushButton("test")
+        testbutton.clicked.connect(self._testClicked)
+        actionbox.addWidget(testbutton)
 
     def dragEnterEvent(self, event):
         event.accept()
@@ -93,48 +93,6 @@ class FlowSolverAppWindow(QMainWindow):
     @pyqtSlot(bool)
     def _boardChanged(self, valid):
         self._solveButton.setEnabled(valid)
-
-
-class TestPopup(QDialog):
-    def __init__(self, parent=None):
-        super(TestPopup, self).__init__(parent)
-
-        layout = QBoxLayout(QBoxLayout.TopToBottom)
-        layout.setSpacing(0)
-        layout.setMargin(0)
-
-        self._widget = TestWidget()
-        layout.addWidget(self._widget)
-
-        status = QStatusBar()
-        status.setSizeGripEnabled(False)
-
-        self._abortButton = QPushButton("close")
-        self._abortButton.clicked.connect(self._abortClicked)
-        status.addPermanentWidget(self._abortButton)
-
-        self._messageLabel = QLabel("ready")
-        status.addWidget(self._messageLabel)
-        layout.addWidget(status)
-
-        layout.setSizeConstraint(QLayout.SetFixedSize)
-        self.setLayout(layout)
-
-        self._board = None
-
-    def setBoard(self, board):
-        self._board = board
-        self._widget.setBoard(board)
-
-    def closeEvent(self, event):
-        super(TestPopup, self).closeEvent(event)
-
-    def _setMessage(self, msg):
-        self._messageLabel.setText(msg)
-
-    @pyqtSlot(bool)
-    def _abortClicked(self, _):
-        self.close()
 
 
 class FlowSolvingPopup(QDialog):

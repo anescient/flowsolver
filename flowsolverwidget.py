@@ -6,45 +6,6 @@ from PyQt4.QtGui import QPainter, QWidget
 from flowboard import FlowBoardPainter
 from grid import SpacedGrid
 from flowsolver import FlowBoardSolver
-from flowboard import FlowBoardGraph
-
-
-class TestWidget(QWidget):
-    def __init__(self):
-        super(TestWidget, self).__init__()
-        self._size = 500
-        self.setFixedSize(self.sizeHint())
-        self._board = None
-        self._grid = None
-        self._graph = None
-        self._parts = None
-
-    def setBoard(self, board):
-        self._board = board
-        self._grid = SpacedGrid(\
-            self._board.size, self._board.size, self.rect().size(), 2)
-        self._graph = FlowBoardGraph(board)
-        self._parts = self._graph.disjointPartitions()
-        self.repaint()
-
-    def paintEvent(self, event):
-        super(TestWidget, self).paintEvent(event)
-        fbp = FlowBoardPainter(self._grid)
-        fbp.drawGrid()
-        fbp.drawBoardFeatures(self._board)
-        if self._parts:
-            k = 1
-            for p in self._parts:
-                self._markVerts(fbp, k, p)
-                k += 1
-        QPainter(self).drawImage(QPoint(0, 0), fbp.image)
-
-    def sizeHint(self):
-        return QSize(self._size, self._size)
-
-    def _markVerts(self, fbp, key, verts):
-        for cell in self._graph.verticesToCells(verts):
-            fbp.markCell(key, cell)
 
 
 class FlowSolverWidget(QWidget):
