@@ -25,9 +25,8 @@ class TestWidget(QWidget):
         self._grid = SpacedGrid(\
             self._board.size, self._board.size, self.rect().size(), 2)
         self._graph = FlowBoardGraph(board)
-        t, s = self._graph.separators()
-        self._parts = [s]
-        self._trees = t
+        self._parts = [self._graph.separators()]
+        self._trees = []
         self.repaint()
 
     def paintEvent(self, event):

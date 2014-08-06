@@ -125,75 +125,35 @@ class QueryableSimpleGraph(object):
             Return vertices which divide their connected component.
         """
         vertices = set(self.vertices if vertices is None else vertices)
-        if not vertices:
-            return []
         toVisit = vertices.copy()
-        tree = Tree(toVisit.pop())
-        stack = [tree.root]
-        lowpoint = {}
         separators = set()
-        rootchildren = 0
-        while stack:
-            v = stack[-1]
-            pushv = next(iter(self.adjacencies(v, toVisit)), None)
-            if pushv is None:
-                stack.pop()
-                if not stack:
-                    break  # following test doesn't work for root
-                lowpoint[v] = tree.depthOf(v)
-                for nv in self.adjacencies(v, vertices):
-                    if nv != tree.parent(v):
-                        lowpoint[v] = min(lowpoint[v], tree.depthOf(nv))
-                for cv in tree.children(v):
-                    lowpoint[v] = min(lowpoint[v], lowpoint[cv])
-                    if lowpoint[cv] >= tree.depthOf(v):
+        while toVisit:
+            stack = [toVisit.pop()]
+            depth = {stack[-1]: 0}
+            lowpoint = depth.copy()
+            v_child = None
+            while stack:
+                v = stack[-1]
+                v_next = next(iter(self.adjacencies(v, toVisit)), None)
+                if v_next is None:
+                    stack.pop()
+                    if not stack:
+                        break
+                    v_parent = stack[-1]
+                    for v_adj in self.adjacencies(v, vertices):
+                        if v_adj != v_parent:
+                            lowpoint[v] = min(lowpoint[v], depth[v_adj])
+                else:
+                    lowpoint[v_next] = depth[v_next] = len(stack)
+                    toVisit.remove(v_next)
+                    stack.append(v_next)
+
+                if v_child is not None:
+                    lowpoint[v] = min(lowpoint[v], lowpoint[v_child])
+                    if lowpoint[v_child] >= depth[v] and v not in separators:
                         separators.add(v)
-            else:
-                if len(stack) == 1:
-                    rootchildren += 1
-                toVisit.remove(pushv)
-                tree.add(pushv, v)
-                stack.append(pushv)
-        if rootchildren > 1:
-            separators.add(tree.root)
-        trees = [tree]
-        if toVisit:
-            t, s = self.separators(toVisit)
-            trees.extend(t)
-            separators |= s
-        return (trees, separators)
-
-    def depthFirstTree(self, root, vertices=None):
-        """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
-            Start at root, making it the root of the tree.
-            Return instance of Tree including vertices connected to root.
-        """
-        openVerts = set(self.vertices if vertices is None else vertices)
-        assert root in openVerts
-        openVerts.remove(root)
-        tree = Tree(root)
-        stack = [root]
-        while stack:
-            v = stack[-1]
-            cv = next(iter(self.adjacencies(v, openVerts)), None)
-            if cv is None:
-                stack.pop()
-            else:
-                openVerts.remove(cv)
-                tree.add(cv, v)
-                stack.append(cv)
-                assert tree.depthOf(cv) == len(stack) - 1
-        return tree
-
-    def isBiconnected(self, vertices=None):
-        """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
-            Return True iff graph is connected and no vertex is a separator.
-        """
-        pass
+                v_child = v if v_next is None else None
+        return separators
 
     def biconnectedComponents(self, vertices=None):
         pass
@@ -265,60 +225,6 @@ class SimpleGraph(QueryableSimpleGraph):
         self._edges[v2].remove(v1)
 
 
-class Tree(object):
-    def __init__(self, root):
-        self._root = root
-        self._nodes = {}  # vertex : (parent, depth)
-        self._nodes[root] = (None, 0)
-
-    @property
-    def root(self):
-        return self._root
-
-    @property
-    def edges(self):
-        for v, (pv, _) in self._nodes.iteritems():
-            if pv is not None:
-                yield (pv, v)
-
-    def __contains__(self, v):
-        return v in self._nodes
-
-    def add(self, v, parent):
-        assert v not in self._nodes
-        self._nodes[v] = (parent, self.depthOf(parent) + 1)
-
-    def depthOf(self, v):
-        return self._nodes[v][1]
-
-    def parent(self, v):
-        return self._nodes[v][0]
-
-    def children(self, v):
-        return (cv for cv, (pv, _) in self._nodes.iteritems() if pv == v)
-
-    def findPath(self, v, u):
-        assert v in self._nodes
-        assert u in self._nodes
-        v_path = [v]  # path from v toward root
-        u_path = [u]  # path from u toward root
-        while v_path[-1] != u_path[-1]:
-            advance_v = self.depthOf(v_path[-1]) > self.depthOf(u_path[-1])
-            advance_u = self.depthOf(u_path[-1]) > self.depthOf(v_path[-1])
-            if advance_v or not advance_u:
-                v_path.append(self._nodes[v_path[-1]][0])
-            if advance_u or not advance_v:
-                u_path.append(self._nodes[u_path[-1]][0])
-        v_path.extend(reversed(u_path[:-1]))
-        return v_path
-
-    def pathToRoot(self, v):
-        v_path = [v]
-        while v_path[-1] != self._root:
-            v_path.append(self.parent(v_path[-1]))
-        return v_path
-
-
 def _testGraph():
     g = SimpleGraph()
     assert isinstance(g, QueryableSimpleGraph)
@@ -388,32 +294,7 @@ def _testGraph():
     assert g.isConnectedSet(set(verts[:1] + verts[-1:]))
 
 
-def _testTree():
-    t = Tree(1)
-    assert t.root == 1
-    assert 1 in t
-    assert t.depthOf(1) == 0
-    assert t.parent(1) is None
-    assert t.findPath(1, 1) == [1]
-    t.add(2, 1)
-    assert t.depthOf(2) == 1
-    assert t.parent(2) == 1
-    t.add(3, 1)
-    assert t.findPath(2, 3) == [2, 1, 3]
-    t.add(4, 2)
-    t.add(5, 3)
-    assert t.findPath(4, 5) == [4, 2, 1, 3, 5]
-    assert t.findPath(2, 5) == [2, 1, 3, 5]
-    assert t.findPath(4, 3) == [4, 2, 1, 3]
-    t.add(6, 2)
-    t.add(7, 2)
-    t.add(9, 7)
-    assert t.findPath(6, 3) == [6, 2, 1, 3]
-    assert t.findPath(6, 9) == [6, 2, 7, 9]
-
-
 if __name__ == '__main__':
     _testGraph()
-    _testTree()
     print "Tests passed."
     exit(0)
