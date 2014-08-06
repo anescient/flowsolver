@@ -2,9 +2,9 @@
 
 print "loading testbench"
 
-from PyQt4.QtCore import QPoint, QSize, pyqtSlot
+from PyQt4.QtCore import QPoint, QLine, QSize, pyqtSlot
 from PyQt4.QtGui import QPushButton, QDialog, QStatusBar, QLayout, \
-    QBoxLayout, QWidget
+    QBoxLayout, QWidget, QPen, QColor
 from flowboard import FlowBoardGraph
 from flowpainter import SpacedGrid, FlowBoardPainter
 
@@ -18,13 +18,16 @@ class TestWidget(QWidget):
         self._grid = None
         self._graph = None
         self._parts = None
+        self._trees = None
 
     def setBoard(self, board):
         self._board = board
         self._grid = SpacedGrid(\
             self._board.size, self._board.size, self.rect().size(), 2)
         self._graph = FlowBoardGraph(board)
-        self._parts = self._graph.disjointPartitions()
+        t, s = self._graph.separators()
+        self._parts = [s]
+        self._trees = t
         self.repaint()
 
     def paintEvent(self, event):
@@ -38,10 +41,20 @@ class TestWidget(QWidget):
             for p in self._parts:
                 self._markVerts(ptr, k, p)
                 k += 1
+        if self._trees:
+            for t in self._trees:
+                self._drawEdges(ptr, t.edges)
         ptr.end()
 
     def sizeHint(self):
         return QSize(self._size, self._size)
+
+    def _drawEdges(self, ptr, edges):
+        ptr.setPen(QPen(QColor(255, 255, 255), 2))
+        for edge in edges:
+            c1, c2 = self._graph.verticesToCells(edge)
+            line = QLine(self._grid.cellCenter(c1), self._grid.cellCenter(c2))
+            ptr.drawLine(line)
 
     def _markVerts(self, ptr, key, verts):
         div = 4
