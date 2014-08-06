@@ -7,7 +7,6 @@ from PyQt4.QtGui import QApplication, QMainWindow, QColor, QPushButton, \
 from QSquareWidget import QSquareWidgetContainer
 from flowboardeditor import FlowBoardEditor
 from flowsolverwidget import FlowSolverWidget
-from testbench import TestPopup
 
 
 class FlowSolverAppWindow(QMainWindow):
@@ -51,12 +50,6 @@ class FlowSolverAppWindow(QMainWindow):
         self._solvepopup = FlowSolvingPopup(self)
         self._solvepopup.setModal(True)
 
-        self._testpopup = TestPopup(self)
-        self._testpopup.setModal(True)
-        testbutton = QPushButton("test")
-        testbutton.clicked.connect(self._testClicked)
-        actionbox.addWidget(testbutton)
-
     def dragEnterEvent(self, event):
         event.accept()
 
@@ -72,11 +65,6 @@ class FlowSolverAppWindow(QMainWindow):
     def _solveClicked(self, _):
         self._solvepopup.show()
         self._solvepopup.runSolve(self._editor.getBoard())
-
-    @pyqtSlot(bool)
-    def _testClicked(self, _):
-        self._testpopup.show()
-        self._testpopup.setBoard(self._editor.getBoard())
 
     @pyqtSlot(bool)
     def _openClicked(self, _):

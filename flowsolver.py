@@ -174,11 +174,6 @@ class FlowGraphSolver(object):
                 assert x > 0
                 if x == 1:
                     return True
-
-            # TODO biconnected components
-            # check if any biconnected component cannot be covered
-            # check if any cut vertex must be used by more than one pair
-
             return False
 
         def takeNextFrame(self):

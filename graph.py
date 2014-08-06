@@ -118,17 +118,6 @@ class QueryableSimpleGraph(object):
         openVerts.discard(v)
         return not self.isConnectedSet(links, openVerts)
 
-    def isBiconnected(self, vertices=None):
-        """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
-            Return True iff graph is connected and no vertex is a separator.
-        """
-        pass
-
-    def biconnectedComponents(self, vertices=None):
-        pass
-
     def connectedComponent(self, v, vertices=None):
         """
             vertices: use only these vertices and their incident edges
