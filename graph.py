@@ -73,23 +73,35 @@ class QueryableSimpleGraph(object):
             Return None if not connected.
             mask: use only these vertices and their incident edges
         """
-        toVisit = self._maskVertices(mask)
-        if v1 not in toVisit or v2 not in toVisit:
-            return None
-        toVisit.remove(v2)
-        tree = Tree(v2)
-        while tree.unmarkedLeafs:
-            for v in tree.unmarkedLeafs:
-                tree.mark(v)
-                ext = self.adjacencies(v, toVisit)
-                toVisit -= ext
+        if self.adjacent(v1, v2):
+            return [v1, v2]
+        mask_a = self._maskVertices(mask)
+        mask_a.discard(v1)
+        mask_a.discard(v2)
+        mask_b = mask_a.copy()
+        tree_a = tree1 = Tree(v1)
+        tree_b = tree2 = Tree(v2)
+        join = None
+        while mask_a and join is None:
+            for v in tree_a.unmarkedLeafs:
+                tree_a.mark(v)
+                ext = self.adjacencies(v, mask_a)
+                mask_a -= ext
                 for v_ext in ext:
-                    tree.add(v_ext, v)
-            if v1 in tree:
+                    tree_a.add(v_ext, v)
+                    if tree_b.hasLeaf(v_ext):
+                        join = v_ext
+                        break
+                else:
+                    continue
                 break
-        else:
+            if not any(tree_a.unmarkedLeafs):
+                break
+            tree_a, tree_b = tree_b, tree_a
+            mask_a, mask_b = mask_b, mask_a
+        if join is None:
             return None
-        return tree.pathToRoot(v1)
+        return tree1.pathFromRoot(join) + tree2.pathToRoot(tree2.parent(join))
 
     def isConnectedSet(self, vertices, mask=None):
         """
@@ -184,7 +196,7 @@ class QueryableSimpleGraph(object):
 
             components.append(subtrees[root])
             del subtrees[root]
-        assert len(subtrees) == 0
+        assert not subtrees
         return (components, separators)
 
     def connectedComponent(self, v, mask=None):
@@ -294,6 +306,9 @@ class Tree(object):
     def __contains__(self, v):
         return v in self._nodes
 
+    def hasLeaf(self, v):
+        return v in self._leafs
+
     def add(self, v, parent):
         assert v not in self._nodes
         self._nodes[v] = (parent, self.depthOf(parent) + 1)
@@ -333,6 +348,11 @@ class Tree(object):
             path.append(self.parent(path[-1]))
         return path
 
+    def pathFromRoot(self, v):
+        path = self.pathToRoot(v)
+        path.reverse()
+        return path
+
 
 def _testGraph():
     g = SimpleGraph()
@@ -344,7 +364,7 @@ def _testGraph():
         verts.append(g.pushVertex())
     assert len(set(verts)) == len(verts)
     for v in verts:
-        assert len(g.adjacencies(v)) == 0
+        assert not g.adjacencies(v)
         assert g.connectedComponent(v) == set([v])
         assert not g.isSeparator(v)
         assert g.isConnectedSet([v])
@@ -383,7 +403,7 @@ def _testGraph():
     g.asReadOnly()
     parts = g.disjointPartitions(verts[:2] + verts[3:])
     assert len(parts) == 2
-    assert len(parts[0].intersection(parts[1])) == 0
+    assert not parts[0].intersection(parts[1])
     assert g.isConnectedSet(parts[0])
     assert g.isConnectedSet(parts[1])
     for v1 in parts[0]:
@@ -396,7 +416,7 @@ def _testGraph():
     for v in drops:
         g.removeVertex(v)
         verts.remove(v)
-    assert len(g.adjacencies(verts[-1])) == 0
+    assert not g.adjacencies(verts[-1])
     for v in verts[:-1]:
         assert len(g.adjacencies(v)) == 1
         assert not g.isSeparator(v)
@@ -477,7 +497,7 @@ def _testGraphBiconnected():
                 bcs_, seps_ = g.biconnectedComponents(bc)
                 assert len(bcs_) == 1
                 assert bcs_[0] == bc
-                assert len(seps_) == 0
+                assert not seps_
                 for v in bc:
                     assert bc.issubset(g.connectedComponent(v))
                     assert bc == g.connectedComponent(v, bc)
@@ -493,9 +513,11 @@ def _testTree():
     assert t.findPath(1, 1) == [1]
     assert set(t.leafs) == set([1])
     assert set(t.leafs) == set(t.unmarkedLeafs)
+    assert t.hasLeaf(1)
     t.mark(1)
-    assert len(set(t.unmarkedLeafs)) == 0
+    assert not any(t.unmarkedLeafs)
     t.add(2, 1)
+    assert not t.hasLeaf(1)
     assert set(t.leafs) == set([2])
     assert t.depthOf(2) == 1
     assert t.parent(2) == 1
@@ -518,8 +540,12 @@ def _testTree():
     assert t.findPath(6, 9) == [6, 2, 7, 9]
     assert t.findPath(9, 6) == [9, 7, 2, 6]
     assert t.findPath(9, 1) == t.pathToRoot(9)
+    assert not t.hasLeaf(-1)
     for v in t.vertices:
+        assert v in t
+        assert t.hasLeaf(v) == (v in t.leafs)
         rp = t.pathToRoot(v)
+        assert rp == list(reversed(t.pathFromRoot(v)))
         assert t.depthOf(v) == len(rp) - 1
         for a, b in zip(rp, rp[1:]):
             assert t.parent(a) == b
