@@ -66,22 +66,49 @@ class QueryableSimpleGraph(object):
             flip = not flip
         return True
 
-    def isConnectedSet(self, vset, mask=None):
+    def shortestPath(self, v1, v2, mask=None):
         """
-            Return True iff all vertices in vset are connected.
+            Return a minimal list of vertices connecting v1 to v2.
+                path[0] == v1, path[-1] == v2
+            Return None if not connected.
             mask: use only these vertices and their incident edges
         """
-        if len(vset) == 1:
-            return True
-        elif len(vset) == 2:
-            it = iter(vset)
-            return self.connected(next(it), next(it), mask)
         toVisit = self._maskVertices(mask)
-        toVisit |= vset
-        fronts = [self.adjacencies(v, toVisit) for v in vset]
+        if v1 not in toVisit or v2 not in toVisit:
+            return None
+        toVisit.remove(v2)
+        tree = Tree(v2)
+        while tree.unmarkedLeafs:
+            for v in tree.unmarkedLeafs:
+                tree.mark(v)
+                ext = self.adjacencies(v, toVisit)
+                toVisit -= ext
+                for v_ext in ext:
+                    tree.add(v_ext, v)
+            if v1 in tree:
+                break
+        else:
+            return None
+        return tree.pathToRoot(v1)
+
+    def isConnectedSet(self, vertices, mask=None):
+        """
+            Return True iff all pairs from 'vertices' are connected.
+            mask: use only these vertices and their incident edges
+        """
+        if len(vertices) == 1:
+            return True
+        elif len(vertices) == 2:
+            it = iter(vertices)
+            return self.connected(next(it), next(it), mask)
+        if not isinstance(vertices, (set, frozenset)):
+            vertices = frozenset(vertices)
+        toVisit = self._maskVertices(mask)
+        toVisit |= vertices
+        fronts = [self.adjacencies(v, toVisit) for v in vertices]
         if not all(fronts):
             return False
-        toVisit -= vset
+        toVisit -= vertices
         while len(fronts) > 1:
             front = fronts.pop(0)
             joined = False
@@ -234,6 +261,79 @@ class SimpleGraph(QueryableSimpleGraph):
         self._edges[v2].remove(v1)
 
 
+class Tree(object):
+    def __init__(self, root):
+        self._root = root
+        self._nodes = {}  # vertex : (parent, depth)
+        self._nodes[root] = (None, 0)
+        self._leafs = set([root])
+        self._marked = set()
+
+    @property
+    def root(self):
+        return self._root
+
+    @property
+    def vertices(self):
+        return iter(self._nodes)
+
+    @property
+    def leafs(self):
+        return iter(self._leafs)
+
+    @property
+    def unmarkedLeafs(self):
+        return self._leafs - self._marked
+
+    @property
+    def edges(self):
+        for v, (pv, _) in self._nodes.iteritems():
+            if pv is not None:
+                yield (pv, v)
+
+    def __contains__(self, v):
+        return v in self._nodes
+
+    def add(self, v, parent):
+        assert v not in self._nodes
+        self._nodes[v] = (parent, self.depthOf(parent) + 1)
+        self._leafs.discard(parent)
+        self._leafs.add(v)
+
+    def mark(self, v):
+        assert v in self._nodes
+        self._marked.add(v)
+
+    def depthOf(self, v):
+        return self._nodes[v][1]
+
+    def parent(self, v):
+        return self._nodes[v][0]
+
+    def findPath(self, v1, v2):
+        assert v1 in self._nodes
+        assert v2 in self._nodes
+        path1 = [v1]  # path from v1 toward root
+        path2 = [v2]  # path from v2 toward root
+        depth1 = self.depthOf(v1)
+        depth2 = self.depthOf(v2)
+        while path1[-1] != path2[-1]:
+            if depth1 >= depth2:
+                path1.append(self.parent(path1[-1]))
+                depth1 -= 1
+            if depth1 < depth2:
+                path2.append(self.parent(path2[-1]))
+                depth2 -= 1
+        path1.extend(reversed(path2[:-1]))
+        return path1
+
+    def pathToRoot(self, v):
+        path = [v]
+        while path[-1] != self._root:
+            path.append(self.parent(path[-1]))
+        return path
+
+
 def _testGraph():
     g = SimpleGraph()
     assert isinstance(g, QueryableSimpleGraph)
@@ -268,7 +368,16 @@ def _testGraph():
     assert not g.isSeparator(verts[0])
     assert not g.isSeparator(verts[-1])
     assert all(g.isSeparator(v) for v in verts[1:-1])
+    assert g.shortestPath(verts[0], verts[-1]) == verts
+    assert g.shortestPath(verts[-1], verts[0]) == list(reversed(verts))
+    shortcut = g.pushVertex()
+    g.addEdge(verts[0], shortcut)
+    g.addEdge(verts[-1], shortcut)
+    assert g.shortestPath(verts[0], verts[-1]) == \
+        [verts[0], shortcut, verts[-1]]
+    g.removeVertex(shortcut)
     g.addEdge(verts[0], verts[-1])
+    assert g.shortestPath(verts[0], verts[-1]) == [verts[0], verts[-1]]
     assert not any(g.isSeparator(v) for v in verts)
     g.removeEdge(verts[0], verts[-1])
     g.asReadOnly()
@@ -277,7 +386,10 @@ def _testGraph():
     assert len(parts[0].intersection(parts[1])) == 0
     assert g.isConnectedSet(parts[0])
     assert g.isConnectedSet(parts[1])
-    assert not g.isConnectedSet(set(verts))
+    for v1 in parts[0]:
+        for v2 in parts[1]:
+            assert g.shortestPath(v1, v2, verts[:2] + verts[3:]) is None
+    assert not g.isConnectedSet(verts)
     assert verts[2] not in parts[0].union(parts[1])
     assert parts[0].union(parts[1]) == set(verts) - set(verts[2:3])
     drops = [verts[i] for i in [2, 5, 8]]
@@ -372,8 +484,50 @@ def _testGraphBiconnected():
             g.removeVertex(verts.pop())
 
 
+def _testTree():
+    t = Tree(1)
+    assert t.root == 1
+    assert 1 in t
+    assert t.depthOf(1) == 0
+    assert t.parent(1) is None
+    assert t.findPath(1, 1) == [1]
+    assert set(t.leafs) == set([1])
+    assert set(t.leafs) == set(t.unmarkedLeafs)
+    t.mark(1)
+    assert len(set(t.unmarkedLeafs)) == 0
+    t.add(2, 1)
+    assert set(t.leafs) == set([2])
+    assert t.depthOf(2) == 1
+    assert t.parent(2) == 1
+    t.add(3, 1)
+    assert t.findPath(2, 3) == [2, 1, 3]
+    t.add(4, 2)
+    t.add(5, 3)
+    assert set(t.leafs) == set([4, 5])
+    assert t.findPath(4, 5) == [4, 2, 1, 3, 5]
+    assert t.findPath(2, 5) == [2, 1, 3, 5]
+    assert t.findPath(4, 3) == [4, 2, 1, 3]
+    t.add(6, 2)
+    t.add(7, 2)
+    t.add(9, 7)
+    t.mark(5)
+    assert set(t.leafs) == set([4, 5, 6, 9])
+    assert set(t.unmarkedLeafs) == set([4, 6, 9])
+    assert t.findPath(6, 3) == [6, 2, 1, 3]
+    assert t.findPath(3, 6) == [3, 1, 2, 6]
+    assert t.findPath(6, 9) == [6, 2, 7, 9]
+    assert t.findPath(9, 6) == [9, 7, 2, 6]
+    assert t.findPath(9, 1) == t.pathToRoot(9)
+    for v in t.vertices:
+        rp = t.pathToRoot(v)
+        assert t.depthOf(v) == len(rp) - 1
+        for a, b in zip(rp, rp[1:]):
+            assert t.parent(a) == b
+
+
 if __name__ == '__main__':
     _testGraph()
     _testGraphBiconnected()
+    _testTree()
     print "Tests passed."
     exit(0)

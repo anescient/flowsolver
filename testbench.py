@@ -2,6 +2,7 @@
 
 print "loading testbench"
 
+import random
 from PyQt4.QtCore import QPoint, QLine, QLineF, QSize, pyqtSlot
 from PyQt4.QtGui import QPushButton, QDialog, QStatusBar, QLayout, \
     QBoxLayout, QWidget, QPen, QColor
@@ -17,7 +18,9 @@ class TestWidget(QWidget):
         self._board = None
         self._grid = None
         self._graph = None
+        self._marks = None
         self._parts = None
+        self._paths = None
         self._edges = None
         self._trees = None
 
@@ -26,10 +29,18 @@ class TestWidget(QWidget):
         self._grid = SpacedGrid(\
             self._board.size, self._board.size, self.rect().size(), 2)
         self._graph = FlowBoardGraph(board)
-        bcs, _ = self._graph.biconnectedComponents()
-        self._parts = bcs
+        self._marks = []
+        self._parts = []
+        self._paths = []
         self._edges = []
         self._trees = []
+        self.repaint()
+
+    def run(self):
+        v1, v2 = random.sample(list(self._graph.vertices), 2)
+        self._marks = [v1, v2]
+        p = self._graph.shortestPath(v1, v2)
+        self._paths = [p] if p else []
         self.repaint()
 
     def paintEvent(self, event):
@@ -38,36 +49,48 @@ class TestWidget(QWidget):
         ptr.fillBackground()
         ptr.drawGrid(self._grid)
         ptr.drawBoardFeatures(self._grid, self._board)
+        if self._marks:
+            for v in self._marks:
+                r = self._grid.cellRect(self._graph.vertexToCell(v))
+                margin = self._grid.minDimension // 4
+                r.adjust(margin, margin, -margin, -margin)
+                ptr.drawEndpoint(r, color=QColor.fromHslF(0, 0, 0.4))
         if self._parts:
             k = 1
             for p in self._parts:
                 self._markVerts(ptr, k, p)
                 k += 1
+        if self._paths:
+            for p in self._paths:
+                edges = [(a, b) for a, b in zip(p, p[1:])]
+                self._drawEdges(ptr, edges, True)
+        if self._edges:
+            self._drawEdges(ptr, self._edges)
         if self._trees:
             self._edges = self._edges or []
             for t in self._trees:
-                self._edges.extend(t.edges)
-        if self._edges:
-            self._drawEdges(ptr, self._edges)
+                self._drawEdges(ptr, t.edges, True)
         ptr.end()
 
     def sizeHint(self):
         return QSize(self._size, self._size)
 
-    def _drawEdges(self, ptr, edges):
-        c = QColor()
-        for i, edge in enumerate(edges):
-            c.setHslF(0.1 * float(i % 10), 0.8, 0.5)
-            ptr.setPen(QPen(c, 2))
+    def _drawEdges(self, ptr, edges, directed=False):
+        c = QColor(255, 255, 255)
+        ptr.setPen(QPen(c, 2))
+        for _, edge in enumerate(edges):
+            #c.setHslF(0.1 * float(i % 10), 0.8, 0.5)
+            #ptr.setPen(QPen(c, 2))
             c1, c2 = self._graph.verticesToCells(edge)
             p1, p2 = self._grid.cellCenter(c1), self._grid.cellCenter(c2)
             line = QLineF(QLine(p2, p1))
             ptr.drawLine(line)
-            line.setAngle(line.angle() + 10)
-            line.setLength(line.length() * 0.25)
-            ptr.drawLine(line)
-            line.setAngle(line.angle() - 20)
-            ptr.drawLine(line)
+            if directed:
+                line.setAngle(line.angle() + 10)
+                line.setLength(line.length() * 0.25)
+                ptr.drawLine(line)
+                line.setAngle(line.angle() - 20)
+                ptr.drawLine(line)
 
     def _markVerts(self, ptr, key, verts):
         key = (key - min(FlowPalette)) % len(FlowPalette) + min(FlowPalette)
@@ -98,6 +121,10 @@ class TestPopup(QDialog):
         status = QStatusBar()
         status.setSizeGripEnabled(False)
 
+        runButton = QPushButton("run")
+        runButton.clicked.connect(self._runClicked)
+        status.addPermanentWidget(runButton)
+
         self._abortButton = QPushButton("close")
         self._abortButton.clicked.connect(self._abortClicked)
         status.addPermanentWidget(self._abortButton)
@@ -115,6 +142,10 @@ class TestPopup(QDialog):
 
     def closeEvent(self, event):
         super(TestPopup, self).closeEvent(event)
+
+    @pyqtSlot(bool)
+    def _runClicked(self, _):
+        self._widget.run()
 
     @pyqtSlot(bool)
     def _abortClicked(self, _):
