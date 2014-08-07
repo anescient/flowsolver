@@ -5,7 +5,7 @@ class QueryableSimpleGraph(object):
     def __init__(self, edgeSets):
         self._edges = edgeSets
         # vertex : set of connected vertices (doubly-linked)
-        # keys are vertex collection (may have empty values)
+        # keys are vertex collection (isolated vertices have empty set)
 
         for v, adj in edgeSets.iteritems():
             assert v not in adj
@@ -18,76 +18,70 @@ class QueryableSimpleGraph(object):
         return iter(self._edges)
 
     def copyEdgeSets(self):
-        edgesets = self._edges.copy()
-        for v in edgesets:
-            edgesets[v] = edgesets[v].copy()
-        return edgesets
+        return dict((v, adj.copy()) for v, adj in self._edges.iteritems())
 
     def adjacent(self, v1, v2):
         """Return True iff v1 and v2 share an edge."""
         return v2 in self._edges[v1]
 
-    def adjacencies(self, v, vertices=None):
+    def adjacencies(self, v, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
             Return set of vertices adjacent to v. Never includes v.
+            mask: use only these vertices and their incident edges
         """
-        if vertices is None:
+        if mask is None:
             return self._edges[v].copy()
         else:
-            return self._edges[v].intersection(vertices)
+            return self._edges[v].intersection(mask)
 
-    def connected(self, v1, v2, vertices=None):
+    def connected(self, v1, v2, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
             Return True iff there is some path from v1 to v2.
+            mask: use only these vertices and their incident edges
         """
         assert v1 != v2
         if v2 in self._edges[v1]:
             return True
-        openVerts = set(self.vertices if vertices is None else vertices)
-        openVerts.discard(v1)
-        openVerts.discard(v2)
-        front1 = self.adjacencies(v1, openVerts)
-        front2 = self.adjacencies(v2, openVerts)
+        toVisit = self._maskVertices(mask)
+        toVisit.discard(v1)
+        toVisit.discard(v2)
+        front1 = self.adjacencies(v1, toVisit)
+        front2 = self.adjacencies(v2, toVisit)
         if not front1 or not front2:
             return False
         flip = False
         while not front1.intersection(front2):
             if flip:
-                openVerts -= front1
+                toVisit -= front1
                 front1 = set.union(\
-                    *(self.adjacencies(fv, openVerts) for fv in front1))
+                    *(self.adjacencies(fv, toVisit) for fv in front1))
                 if not front1:
                     return False
             else:
-                openVerts -= front2
+                toVisit -= front2
                 front2 = set.union(\
-                    *(self.adjacencies(fv, openVerts) for fv in front2))
+                    *(self.adjacencies(fv, toVisit) for fv in front2))
                 if not front2:
                     return False
             flip = not flip
         return True
 
-    def isConnectedSet(self, vset, vertices=None):
+    def isConnectedSet(self, vset, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
             Return True iff all vertices in vset are connected.
+            mask: use only these vertices and their incident edges
         """
         if len(vset) == 1:
             return True
         elif len(vset) == 2:
             it = iter(vset)
-            return self.connected(next(it), next(it), vertices)
-        openVerts = set(self.vertices if vertices is None else vertices)
-        openVerts |= vset
-        fronts = [self.adjacencies(v, openVerts) for v in vset]
+            return self.connected(next(it), next(it), mask)
+        toVisit = self._maskVertices(mask)
+        toVisit |= vset
+        fronts = [self.adjacencies(v, toVisit) for v in vset]
         if not all(fronts):
             return False
-        openVerts -= vset
+        toVisit -= vset
         while len(fronts) > 1:
             front = fronts.pop(0)
             joined = False
@@ -97,35 +91,33 @@ class QueryableSimpleGraph(object):
                     joined = True
             if joined:
                 continue
-            openVerts -= front
+            toVisit -= front
             front = set.union(\
-                *(self.adjacencies(fv, openVerts) for fv in front))
+                *(self.adjacencies(fv, toVisit) for fv in front))
             if not front:
                 return False
             fronts.append(front)
         return True
 
-    def isSeparator(self, v, vertices=None):
+    def isSeparator(self, v, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
             Return True iff removing v will divide v's connected component.
+            mask: use only these vertices and their incident edges
         """
-        openVerts = set(self.vertices if vertices is None else vertices)
-        links = self.adjacencies(v, openVerts)
+        mask = self._maskVertices(mask)
+        links = self.adjacencies(v, mask)
         if len(links) < 2:
             return False
-        openVerts.discard(v)
-        return not self.isConnectedSet(links, openVerts)
+        mask.discard(v)
+        return not self.isConnectedSet(links, mask)
 
-    def biconnectedComponents(self, vertices=None):
+    def biconnectedComponents(self, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
             Return tuple(list(sets), set) containing the sets of vertices
             in biconnected components and the set of articulation points.
+            mask: use only these vertices and their incident edges
         """
-        vertices = set(self.vertices if vertices is None else vertices)
+        vertices = self._maskVertices(mask)
         toVisit = vertices.copy()
         subtrees = dict((v, set([v])) for v in toVisit)
         components = []
@@ -168,32 +160,31 @@ class QueryableSimpleGraph(object):
         assert len(subtrees) == 0
         return (components, separators)
 
-    def connectedComponent(self, v, vertices=None):
+    def connectedComponent(self, v, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
             Return set of vertices connected by some path to v (including v).
+            mask: use only these vertices and their incident edges
         """
-        openVerts = set(self.vertices if vertices is None else vertices)
-        openVerts.add(v)
-        component = set()
-        toVisit = set([v])
-        while toVisit:
-            v = toVisit.pop()
-            component.add(v)
-            openVerts.remove(v)
-            toVisit |= self.adjacencies(v, openVerts)
+        toVisit = self._maskVertices(mask)
+        toVisit.add(v)
+        component = set([v])
+        stack = [v]
+        while stack:
+            v = stack.pop()
+            ext = self.adjacencies(v, toVisit)
+            toVisit -= ext
+            component |= ext
+            stack.extend(ext)
         return component
 
-    def disjointPartitions(self, vertices=None):
+    def disjointPartitions(self, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
-            Return list of sets of vertices.
-            Vertices in each set are connected.
-            Sets are not connected to each other.
+            Return list of sets of vertices such that:
+                All vertices in each set are connected.
+                No two sets are connected to each other.
+            mask: use only these vertices and their incident edges
         """
-        toVisit = set(self.vertices if vertices is None else vertices)
+        toVisit = self._maskVertices(mask)
         partitions = []
         while toVisit:
             p = self.connectedComponent(toVisit.pop(), toVisit)
@@ -201,12 +192,20 @@ class QueryableSimpleGraph(object):
             partitions.append(p)
         return partitions
 
+    def _maskVertices(self, mask=None):
+        """
+            Return a new set containing the graph's vertices.
+            mask: use only these vertices, or all vertices if None
+        """
+        return set(self._edges if mask is None else mask)
+
 
 class SimpleGraph(QueryableSimpleGraph):
     def __init__(self, edgeSets=None):
         super(SimpleGraph, self).__init__(edgeSets or {})
 
     def asReadOnly(self):
+        """Return a read-only interface to this instance."""
         return QueryableSimpleGraph(self._edges)
 
     def pushVertex(self):
@@ -216,7 +215,7 @@ class SimpleGraph(QueryableSimpleGraph):
         return v
 
     def removeVertex(self, v):
-        """Delete a vertex and any related edges."""
+        """Delete a vertex and any incident edges."""
         for adj in self._edges[v]:
             self._edges[adj].remove(v)
         del self._edges[v]
@@ -229,7 +228,7 @@ class SimpleGraph(QueryableSimpleGraph):
         self._edges[v2].add(v1)
 
     def removeEdge(self, v1, v2):
-        """Disconnect v1 and v2. Error if not connected."""
+        """Delete edge between v1 and v2. Error if no such edge."""
         assert v1 != v2
         self._edges[v1].remove(v2)
         self._edges[v2].remove(v1)
