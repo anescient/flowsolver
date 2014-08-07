@@ -118,28 +118,30 @@ class QueryableSimpleGraph(object):
         openVerts.discard(v)
         return not self.isConnectedSet(links, openVerts)
 
-    def separators(self, vertices=None):
+    def biconnectedComponents(self, vertices=None):
         """
             vertices: use only these vertices and their incident edges
                       if None, use all vertices in graph
-            Return vertices which divide their connected component.
+            Return tuple(list(sets), set) containing the sets of vertices
+            in biconnected components and the set of articulation points.
         """
         vertices = set(self.vertices if vertices is None else vertices)
         toVisit = vertices.copy()
+        subtrees = dict((v, set([v])) for v in toVisit)
+        components = []
         separators = set()
         while toVisit:
-            stack = [toVisit.pop()]
-            depth = {stack[-1]: 0}
-            lowpoint = depth.copy()
+            root = toVisit.pop()
+            stack = [root]
+            depth = {root: 0}
+            lowpoint = {root: 0}
             v_child = None
             while stack:
                 v = stack[-1]
                 v_next = next(iter(self.adjacencies(v, toVisit)), None)
                 if v_next is None:
                     stack.pop()
-                    if not stack:
-                        break
-                    v_parent = stack[-1]
+                    v_parent = stack[-1] if stack else None
                     for v_adj in self.adjacencies(v, vertices):
                         if v_adj != v_parent:
                             lowpoint[v] = min(lowpoint[v], depth[v_adj])
@@ -150,13 +152,21 @@ class QueryableSimpleGraph(object):
 
                 if v_child is not None:
                     lowpoint[v] = min(lowpoint[v], lowpoint[v_child])
-                    if lowpoint[v_child] >= depth[v] and v not in separators:
+                    if stack and lowpoint[v_child] >= depth[v]:
                         separators.add(v)
-                v_child = v if v_next is None else None
-        return separators
+                        c = subtrees[v_child]
+                        c.add(v)
+                        components.append(c)
+                    else:
+                        subtrees[v] |= subtrees[v_child]
+                    del subtrees[v_child]
 
-    def biconnectedComponents(self, vertices=None):
-        pass
+                v_child = v if v_next is None else None
+
+            components.append(subtrees[root])
+            del subtrees[root]
+        assert len(subtrees) == 0
+        return (components, separators)
 
     def connectedComponent(self, v, vertices=None):
         """
@@ -193,8 +203,8 @@ class QueryableSimpleGraph(object):
 
 
 class SimpleGraph(QueryableSimpleGraph):
-    def __init__(self):
-        super(SimpleGraph, self).__init__({})
+    def __init__(self, edgeSets=None):
+        super(SimpleGraph, self).__init__(edgeSets or {})
 
     def asReadOnly(self):
         return QueryableSimpleGraph(self._edges)
@@ -294,7 +304,77 @@ def _testGraph():
     assert g.isConnectedSet(set(verts[:1] + verts[-1:]))
 
 
+def _testGraphBiconnected():
+    edgesets = [{\
+        0: set([]), 2: set([3, 13]), 3: set([2, 4, 14]), 4: set([3, 15]), \
+        13: set([2, 14]), 14: set([25, 3, 13, 15]), 15: set([4, 14]), \
+        17: set([18, 28]), 18: set([17, 29]), 22: set([23]), \
+        23: set([34, 22]), 25: set([36, 14]), 28: set([17, 29, 39]), \
+        29: set([18, 28]), 34: set([35, 45, 23]), 35: set([34, 36]), \
+        36: set([25, 35, 37, 47]), 37: set([36, 38]), 38: set([37, 39]), \
+        39: set([28, 38]), 42: set([119]), 44: set([45]), 45: set([34, 44]), \
+        47: set([58, 36]), 52: set([120, 63]), 54: set([120, 65]), \
+        57: set([58, 68]), 58: set([57, 59, 47]), 59: set([58, 70]), \
+        63: set([52, 118]), 65: set([118, 54]), 66: set([77]), \
+        68: set([57, 79]), 70: set([81, 59]), 72: set([]), 75: set([117]), \
+        77: set([66]), 79: set([80, 68]), 80: set([81, 91, 79]), \
+        81: set([80, 70]), 84: set([95]), 91: set([80, 102]), \
+        94: set([105, 95]), 95: set([96, 106, 84, 94]), 96: set([95]), \
+        99: set([100]), 100: set([99, 111]), 102: set([91]), \
+        104: set([105, 115]), 105: set([104, 106, 116, 94]), \
+        106: set([105, 95]), 111: set([100]), 115: set([104, 116]), \
+        116: set([105, 115]), 117: set([75, 119]), 118: set([65, 63]), \
+        119: set([42, 117]), 120: set([52, 54])},
+
+        {2: set([3]), 3: set([2, 4, 10]), 4: set([3]), 10: set([17, 3]), \
+        14: set([21]), 16: set([17, 23]), 17: set([16, 24, 10, 18]), \
+        18: set([17, 25]), 20: set([27]), 21: set([28, 22, 14]), \
+        22: set([21, 23]), 23: set([16, 24, 30, 22]), \
+        24: set([17, 31, 25, 23]), 25: set([24, 32, 18, 26]), \
+        26: set([25, 27]), 27: set([26, 20, 34]), 28: set([21]), \
+        30: set([31, 23]), 31: set([24, 32, 38, 30]), 32: set([25, 31]), \
+        34: set([27]), 38: set([45, 31]), 44: set([45]), \
+        45: set([44, 46, 38]), 46: set([45])}]
+    for es in edgesets:
+        g = SimpleGraph(es)
+        verts = set(g.vertices)
+        while verts:
+            assert set(es) == verts
+            bcs, seps = g.biconnectedComponents()
+            assert reduce(set.union, bcs) == verts
+            memberbcs = dict((v, set()) for v in verts)
+            for i, bc in enumerate(bcs):
+                for v in bc:
+                    memberbcs[v].add(i)
+            parts = g.disjointPartitions()
+            for v in verts:
+                novparts = g.disjointPartitions(verts - set([v]))
+                if g.isSeparator(v):
+                    assert v in seps
+                    assert len(memberbcs[v]) > 1
+                    assert g.isSeparator(v)
+                    assert len(novparts) == len(parts) + len(memberbcs[v]) - 1
+                else:
+                    assert v not in seps
+                    assert len(memberbcs[v]) == 1
+                    assert not g.isSeparator(v)
+                    if len(g.connectedComponent(v)) == 1:
+                        assert len(novparts) == len(parts) - 1
+                    else:
+                        assert len(novparts) == len(parts)
+            for bc in bcs:
+                bcs_, seps_ = g.biconnectedComponents(bc)
+                assert len(bcs_) == 1
+                assert bcs_[0] == bc
+                assert len(seps_) == 0
+                for v in bc:
+                    assert bc.issubset(g.connectedComponent(v))
+                    assert bc == g.connectedComponent(v, bc)
+            g.removeVertex(verts.pop())
+
+
 if __name__ == '__main__':
     _testGraph()
+    _testGraphBiconnected()
     print "Tests passed."
     exit(0)

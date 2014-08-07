@@ -2,11 +2,11 @@
 
 print "loading testbench"
 
-from PyQt4.QtCore import QPoint, QLine, QSize, pyqtSlot
+from PyQt4.QtCore import QPoint, QLine, QLineF, QSize, pyqtSlot
 from PyQt4.QtGui import QPushButton, QDialog, QStatusBar, QLayout, \
     QBoxLayout, QWidget, QPen, QColor
 from flowboard import FlowBoardGraph
-from flowpainter import SpacedGrid, FlowBoardPainter
+from flowpainter import SpacedGrid, FlowBoardPainter, FlowPalette
 
 
 class TestWidget(QWidget):
@@ -18,6 +18,7 @@ class TestWidget(QWidget):
         self._grid = None
         self._graph = None
         self._parts = None
+        self._edges = None
         self._trees = None
 
     def setBoard(self, board):
@@ -25,7 +26,9 @@ class TestWidget(QWidget):
         self._grid = SpacedGrid(\
             self._board.size, self._board.size, self.rect().size(), 2)
         self._graph = FlowBoardGraph(board)
-        self._parts = [self._graph.separators()]
+        bcs, _ = self._graph.biconnectedComponents()
+        self._parts = bcs
+        self._edges = []
         self._trees = []
         self.repaint()
 
@@ -41,21 +44,33 @@ class TestWidget(QWidget):
                 self._markVerts(ptr, k, p)
                 k += 1
         if self._trees:
+            self._edges = self._edges or []
             for t in self._trees:
-                self._drawEdges(ptr, t.edges)
+                self._edges.extend(t.edges)
+        if self._edges:
+            self._drawEdges(ptr, self._edges)
         ptr.end()
 
     def sizeHint(self):
         return QSize(self._size, self._size)
 
     def _drawEdges(self, ptr, edges):
-        ptr.setPen(QPen(QColor(255, 255, 255), 2))
-        for edge in edges:
+        c = QColor()
+        for i, edge in enumerate(edges):
+            c.setHslF(0.1 * float(i % 10), 0.8, 0.5)
+            ptr.setPen(QPen(c, 2))
             c1, c2 = self._graph.verticesToCells(edge)
-            line = QLine(self._grid.cellCenter(c1), self._grid.cellCenter(c2))
+            p1, p2 = self._grid.cellCenter(c1), self._grid.cellCenter(c2)
+            line = QLineF(QLine(p2, p1))
+            ptr.drawLine(line)
+            line.setAngle(line.angle() + 10)
+            line.setLength(line.length() * 0.25)
+            ptr.drawLine(line)
+            line.setAngle(line.angle() - 20)
             ptr.drawLine(line)
 
     def _markVerts(self, ptr, key, verts):
+        key = (key - min(FlowPalette)) % len(FlowPalette) + min(FlowPalette)
         div = 4
         r_mark = self._grid.cellRect((0, 0))
         marksize = self._grid.minDimension // div
