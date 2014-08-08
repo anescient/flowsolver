@@ -53,13 +53,15 @@ class FlowSolverWidget(QWidget):
             return
         self._run = True
         self._startTime = datetime.now()
-        while self._run and not self._solver.run(20):
-            QCoreApplication.processEvents()
-        self._endTime = datetime.now()
-        self.finished.emit()
+        try:
+            while self._run and not self._solver.run(20):
+                QCoreApplication.processEvents()
+        finally:
+            self._endTime = datetime.now()
+            self.finished.emit()
+            self.repaint()
         print
         self._solver.printStats()
-        self.repaint()
 
     def stop(self):
         self._run = False

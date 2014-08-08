@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from collections import deque
+
 
 class QueryableSimpleGraph(object):
     def __init__(self, edgeSets):
@@ -53,14 +55,14 @@ class QueryableSimpleGraph(object):
         while not front1.intersection(front2):
             if flip:
                 toVisit -= front1
-                front1 = set.union(\
-                    *(self.adjacencies(fv, toVisit) for fv in front1))
+                front1 = reduce(set.union, \
+                    (self.adjacencies(fv, toVisit) for fv in front1))
                 if not front1:
                     return False
             else:
                 toVisit -= front2
-                front2 = set.union(\
-                    *(self.adjacencies(fv, toVisit) for fv in front2))
+                front2 = reduce(set.union, \
+                    (self.adjacencies(fv, toVisit) for fv in front2))
                 if not front2:
                     return False
             flip = not flip
@@ -116,13 +118,11 @@ class QueryableSimpleGraph(object):
         elif len(vertices) == 2:
             it = iter(vertices)
             return self.connected(next(it), next(it), mask)
-        if not isinstance(vertices, (set, frozenset)):
-            vertices = frozenset(vertices)
         toVisit = self._maskVertices(mask)
-        toVisit |= vertices
-        fronts = [set([v]) for v in vertices]
+        toVisit.update(vertices)
+        fronts = deque(set([v]) for v in vertices)
         while len(fronts) > 1:
-            front = fronts.pop(0)
+            front = fronts.popleft()
             joined = False
             for joinfront in fronts:
                 if front.intersection(joinfront):
@@ -131,8 +131,8 @@ class QueryableSimpleGraph(object):
             if joined:
                 continue
             toVisit -= front
-            front = set.union(\
-                *(self.adjacencies(v, toVisit) for v in front))
+            front = reduce(set.union, \
+                (self.adjacencies(v, toVisit) for v in front))
             if not front:
                 return False
             fronts.append(front)
@@ -157,10 +157,11 @@ class QueryableSimpleGraph(object):
             mask: use only these vertices and their incident edges
         """
         vertices = self._maskVertices(mask)
-        toVisit = vertices.copy()
-        subtrees = dict((v, set([v])) for v in toVisit)
+        subtrees = dict((v, set([v])) for v in vertices)
+        adjs = dict((v, self._edges[v] & vertices) for v in vertices)
         components = []
         separators = set()
+        toVisit = vertices.copy()
         while toVisit:
             root = toVisit.pop()
             stack = [root]
@@ -169,7 +170,14 @@ class QueryableSimpleGraph(object):
             v_child = None
             while stack:
                 v = stack[-1]
-                v_next = next(iter(self.adjacencies(v, toVisit)), None)
+
+                adj = adjs[v]
+                v_next = None
+                while v_next is None and adj:
+                    v_next = adj.pop()
+                    if v_next not in toVisit:
+                        v_next = None
+
                 if v_next is None:
                     stack.pop()
                     v_parent = stack[-1] if stack else None
@@ -339,7 +347,8 @@ class Tree(object):
             if depth1 < depth2:
                 path2.append(self.parent(path2[-1]))
                 depth2 -= 1
-        path1.extend(reversed(path2[:-1]))
+        path2.pop()
+        path1.extend(reversed(path2))
         return path1
 
     def pathToRoot(self, v):
@@ -486,6 +495,8 @@ def _testGraphBiconnected():
             assert set(es) == verts
             bcs, seps = g.biconnectedComponents()
             assert reduce(set.union, bcs) == verts
+            innerbcs = [bc - seps for bc in bcs]
+            assert sum(map(len, innerbcs)) + len(seps) == len(verts)
             memberbcs = dict((v, set()) for v in verts)
             for i, bc in enumerate(bcs):
                 for v in bc:

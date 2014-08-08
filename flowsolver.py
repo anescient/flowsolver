@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from collections import deque
 from itertools import islice, chain, izip
 from flowboard import FlowBoardGraph
 
@@ -207,7 +208,7 @@ class FlowGraphSolver(object):
             assert not self.aborted
             if self._nextframes is None:
                 self._generateNextFrames()
-            return self._nextframes.pop(0)
+            return self._nextframes.popleft()
 
         def abort(self):
             assert self._nextframes is None
@@ -230,14 +231,16 @@ class FlowGraphSolver(object):
             if len(best[1]) > 1:
                 leafmoves = self._leafMoves(movesets)
                 if leafmoves:
-                    self._nextframes = [self.copy(move) for move in leafmoves]
+                    self._nextframes = \
+                        deque(self.copy(move) for move in leafmoves)
                     return
 
             # this sort tends to lead to less convoluted paths in solution
             vidx = best[0]
             moves = sorted(best[1], \
                 key=lambda v: len(self._graph.adjacencies(v, self._openverts)))
-            self._nextframes = [self.copy((vidx, to)) for to in moves]
+            self._nextframes = \
+                deque(self.copy((vidx, to)) for to in moves)
 
         def _possibleMoves(self):
             moves = {}  # vidx : set of vertices to move to
