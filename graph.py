@@ -73,7 +73,9 @@ class QueryableSimpleGraph(object):
             Return None if not connected.
             mask: use only these vertices and their incident edges
         """
-        if self.adjacent(v1, v2):
+        if v1 == v2:
+            return [v1]
+        elif self.adjacent(v1, v2):
             return [v1, v2]
         mask_a = self._maskVertices(mask)
         mask_a.discard(v1)
@@ -83,6 +85,7 @@ class QueryableSimpleGraph(object):
         tree_b = tree2 = Tree(v2)
         join = None
         while mask_a and join is None:
+            ext = None
             for v in tree_a.unmarkedLeafs:
                 tree_a.mark(v)
                 ext = self.adjacencies(v, mask_a)
@@ -95,7 +98,7 @@ class QueryableSimpleGraph(object):
                 else:
                     continue
                 break
-            if not any(tree_a.unmarkedLeafs):
+            if ext is None:
                 break
             tree_a, tree_b = tree_b, tree_a
             mask_a, mask_b = mask_b, mask_a
@@ -392,12 +395,19 @@ def _testGraph():
     assert all(g.isSeparator(v) for v in verts[1:-1])
     assert g.shortestPath(verts[0], verts[-1]) == verts
     assert g.shortestPath(verts[-1], verts[0]) == list(reversed(verts))
+    assert g.shortestPath(verts[3], verts[3]) == [verts[3]]
+
     shortcut = g.pushVertex()
     g.addEdge(verts[0], shortcut)
     g.addEdge(verts[-1], shortcut)
     assert g.shortestPath(verts[0], verts[-1]) == \
         [verts[0], shortcut, verts[-1]]
+
+    assert verts[0] == 0
+    g.removeEdge(verts[-1], shortcut)
+    assert g.shortestPath(shortcut, verts[1]) == [shortcut, verts[0], verts[1]]
     g.removeVertex(shortcut)
+
     g.addEdge(verts[0], verts[-1])
     assert g.shortestPath(verts[0], verts[-1]) == [verts[0], verts[-1]]
     assert not any(g.isSeparator(v) for v in verts)
@@ -518,7 +528,7 @@ def _testTree():
     assert set(t.leafs) == set(t.unmarkedLeafs)
     assert t.hasLeaf(1)
     t.mark(1)
-    assert not any(t.unmarkedLeafs)
+    assert len(t.unmarkedLeafs) == 0
     t.add(2, 1)
     assert not t.hasLeaf(1)
     assert set(t.leafs) == set([2])
