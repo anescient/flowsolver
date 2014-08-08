@@ -117,10 +117,7 @@ class QueryableSimpleGraph(object):
             vertices = frozenset(vertices)
         toVisit = self._maskVertices(mask)
         toVisit |= vertices
-        fronts = [self.adjacencies(v, toVisit) for v in vertices]
-        if not all(fronts):
-            return False
-        toVisit -= vertices
+        fronts = [set([v]) for v in vertices]
         while len(fronts) > 1:
             front = fronts.pop(0)
             joined = False
@@ -132,7 +129,7 @@ class QueryableSimpleGraph(object):
                 continue
             toVisit -= front
             front = set.union(\
-                *(self.adjacencies(fv, toVisit) for fv in front))
+                *(self.adjacencies(v, toVisit) for v in front))
             if not front:
                 return False
             fronts.append(front)
@@ -385,6 +382,11 @@ def _testGraph():
             assert g.connectedComponent(verts[j]) == set(verts[:i + 2])
     for v in verts:
         assert g.connectedComponent(v) == set(verts)
+    assert g.isConnectedSet(verts)
+    assert g.isConnectedSet([verts[2], verts[4]], verts[2:5])
+    assert not g.isConnectedSet([verts[2], verts[4]], [verts[2], verts[4]])
+    assert g.isConnectedSet(verts[:4] + verts[5:])
+    assert not g.isConnectedSet(verts[:4] + verts[5:], verts[:4] + verts[5:])
     assert not g.isSeparator(verts[0])
     assert not g.isSeparator(verts[-1])
     assert all(g.isSeparator(v) for v in verts[1:-1])
@@ -401,15 +403,16 @@ def _testGraph():
     assert not any(g.isSeparator(v) for v in verts)
     g.removeEdge(verts[0], verts[-1])
     g.asReadOnly()
-    parts = g.disjointPartitions(verts[:2] + verts[3:])
+    mask = verts[:2] + verts[3:]
+    parts = g.disjointPartitions(mask)
     assert len(parts) == 2
     assert not parts[0].intersection(parts[1])
     assert g.isConnectedSet(parts[0])
     assert g.isConnectedSet(parts[1])
     for v1 in parts[0]:
         for v2 in parts[1]:
-            assert g.shortestPath(v1, v2, verts[:2] + verts[3:]) is None
-    assert not g.isConnectedSet(verts)
+            assert g.shortestPath(v1, v2, mask) is None
+    assert not g.isConnectedSet(mask, mask)
     assert verts[2] not in parts[0].union(parts[1])
     assert parts[0].union(parts[1]) == set(verts) - set(verts[2:3])
     drops = [verts[i] for i in [2, 5, 8]]
