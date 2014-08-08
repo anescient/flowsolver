@@ -89,6 +89,28 @@ class FlowGraphSolver(object):
                 if common is not None:
                     self._commoncomponents[pairidx] = common
 
+            if len(self._components) > 1:
+                # if any component is usable by only one pair,
+                # commit that pair to that component
+                componentusers = dict((k, set()) for k in self._components)
+                for i, cc in enumerate(self._commoncomponents):
+                    for k in cc:
+                        componentusers[k].add(i)
+                commit = True
+                while commit:
+                    commit = None
+                    for k, users in componentusers.iteritems():
+                        if len(users) == 1:
+                            commit = (next(iter(users)), k)
+                            break
+                    if commit:
+                        i, k = commit
+                        if len(self._commoncomponents[i]) > 1:
+                            for k_ in self._commoncomponents[i]:
+                                componentusers[k_].remove(i)
+                            self._commoncomponents[i] = set([k])
+                        del componentusers[k]
+
         def _closeVertex(self, v):
             self._openverts = self._openverts.copy()
             self._openverts.remove(v)
