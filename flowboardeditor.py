@@ -22,7 +22,7 @@ class FlowBoardEditor(QWidget):
         self._connectToolbar(self._toolbar)
         self._board = None
         self._grid = None
-        self._hoverCell = None
+        self._lastMoveCell = None
         self.newBoard(self._toolbar.selectedSize)
 
     @property
@@ -45,7 +45,7 @@ class FlowBoardEditor(QWidget):
         self.toolbar.selectSize(board.size)
         self._board = board
         self._updateGrid()
-        self._hoverCell = None
+        self._lastMoveCell = None
         self.repaint()
         self.boardChanged.emit(self.boardIsValid)
 
@@ -70,9 +70,9 @@ class FlowBoardEditor(QWidget):
         super(FlowBoardEditor, self).paintEvent(event)
         ptr = FlowBoardPainter(self)
         ptr.drawGrid(self._grid)
-        if self._hoverCell:
-            if self.selectedTool.canApply(self._board, self._hoverCell):
-                ptr.drawCellHighlight(self._grid, self._hoverCell)
+        if self._lastMoveCell:
+            if self.selectedTool.canApply(self._board, self._lastMoveCell):
+                ptr.drawCellHighlight(self._grid, self._lastMoveCell)
         ptr.drawBoardFeatures(self._grid, self._board)
 
     def mousePressEvent(self, event):
@@ -84,7 +84,12 @@ class FlowBoardEditor(QWidget):
 
     def mouseMoveEvent(self, event):
         super(FlowBoardEditor, self).mouseMoveEvent(event)
-        self._markCell(self._grid.findCell(event.pos()))
+        cell = self._grid.findCell(event.pos())
+        if cell != self._lastMoveCell:
+            self._lastMoveCell = cell
+            if cell is not None:
+                self._cellHover(cell, event.buttons())
+            self.repaint()
 
     def _cellClicked(self, cell, button):
         if button == Qt.LeftButton:
@@ -99,6 +104,12 @@ class FlowBoardEditor(QWidget):
                 self.repaint()
                 self.boardChanged.emit(self.boardIsValid)
 
+    def _cellHover(self, cell, buttons):
+        if buttons & Qt.LeftButton:
+            tool = self.selectedTool
+            if tool.continuous and tool.canApply(self._board, cell):
+                tool.applyAction(self._board, cell)
+
     def _takeToolFromCell(self, cell):
         if self._board.hasBridgeAt(cell):
             self.toolbar.tools.selectBridge()
@@ -111,11 +122,6 @@ class FlowBoardEditor(QWidget):
             self.toolbar.tools.selectEndpoint(key)
             return True
         return False
-
-    def _markCell(self, cell):
-        if self._hoverCell != cell:
-            self._hoverCell = cell
-            self.repaint()
 
     def _updateGrid(self):
         self._grid = SpacedGrid(\
@@ -133,6 +139,8 @@ class FlowBoardEditor(QWidget):
 
 
 class FlowTool(QObject):
+    _continuous = False
+
     def __init__(self):
         super(FlowTool, self).__init__()
         self._icon = None
@@ -141,6 +149,10 @@ class FlowTool(QObject):
         if not self._icon or self._icon.size() != size:
             self._icon = self._makeIcon(size)
         return self._icon
+
+    @property
+    def continuous(self):
+        return self._continuous
 
     def canApply(self, board, cell):
         raise NotImplementedError()
@@ -161,6 +173,8 @@ class FlowTool(QObject):
 
 
 class FlowToolClear(FlowTool):
+    _continuous = True
+
     def __init__(self):
         super(FlowToolClear, self).__init__()
 
@@ -224,6 +238,8 @@ class FlowToolBridge(FlowTool):
 
 
 class FlowToolBlock(FlowTool):
+    _continuous = True
+
     def __init__(self):
         super(FlowToolBlock, self).__init__()
 

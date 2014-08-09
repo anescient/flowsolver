@@ -72,8 +72,11 @@ class FlowBoardPainter(QPainter):
             cap=Qt.RoundCap, join=Qt.RoundJoin))
         self.drawLines(list(FlowBoardPainter._flowLines(grid, cells)))
 
-    def drawEndpoint(self, rect, key):
-        color = FlowPalette[key]
+    def drawEndpoint(self, rect, key=None, color=None):
+        if key is not None:
+            color = FlowPalette[key]
+        else:
+            assert isinstance(color, QColor)
         self.save()
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setBrush(color)
@@ -104,7 +107,7 @@ class FlowBoardPainter(QPainter):
     def _flowLines(grid, cells):
         assert len(cells) > 1
         cells = FlowBoardPainter._simplifyFlow(cells)
-        for start, end in zip(cells[:-1], cells[1:]):
+        for start, end in zip(cells, cells[1:]):
             yield QLine(grid.cellCenter(start), \
                         grid.cellCenter(end))
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from collections import deque
 from itertools import islice, chain, izip
 from flowboard import FlowBoardGraph
 
@@ -89,6 +90,28 @@ class FlowGraphSolver(object):
                 if common is not None:
                     self._commoncomponents[pairidx] = common
 
+            if len(self._components) > 1:
+                # if any component is usable by only one pair,
+                # commit that pair to that component
+                componentusers = dict((k, set()) for k in self._components)
+                for i, cc in enumerate(self._commoncomponents):
+                    for k in cc:
+                        componentusers[k].add(i)
+                commit = True
+                while commit:
+                    commit = None
+                    for k, users in componentusers.iteritems():
+                        if len(users) == 1:
+                            commit = (next(iter(users)), k)
+                            break
+                    if commit:
+                        i, k = commit
+                        if len(self._commoncomponents[i]) > 1:
+                            for k_ in self._commoncomponents[i]:
+                                componentusers[k_].remove(i)
+                            self._commoncomponents[i] = set([k])
+                        del componentusers[k]
+
         def _closeVertex(self, v):
             self._openverts = self._openverts.copy()
             self._openverts.remove(v)
@@ -174,13 +197,61 @@ class FlowGraphSolver(object):
                 assert x > 0
                 if x == 1:
                     return True
+
+            return False
+
+        def biconnectedUnsolvable(self):
+            for k, component in self._components.iteritems():
+                bcs, seps = self._graph.biconnectedComponents(component)
+                if not seps:
+                    continue
+
+                # check if any biconnected component cannot be covered
+                leafbcis = set()
+                for i, bc in enumerate(bcs):
+                    if len(bc & seps) == 1:
+                        leafbcis.add(i)
+                for i in leafbcis:
+                    bc = bcs[i]
+                    for pairi, (v1, v2) in enumerate(self._headpairs):
+                        if k not in self._commoncomponents[pairi]:
+                            continue
+                        adj1 = self._graph.adjacencies(v1)
+                        if adj1 & bc:
+                            break
+                        adj2 = self._graph.adjacencies(v2)
+                        if adj2 & bc:
+                            break
+                    else:
+                        return True
+
+                # check if any cut vertex must be used by more than one pair
+                sepconflicts = set()
+                for pairi, (v1, v2) in enumerate(self._headpairs):
+                    if k not in self._commoncomponents[pairi]:
+                        continue
+                    if len(self._commoncomponents[pairi]) > 1:
+                        continue
+                    adj1 = self._graph.adjacencies(v1)
+                    adj2 = self._graph.adjacencies(v2)
+                    bcis1 = set(i for i, bc in enumerate(bcs) if adj1 & bc)
+                    bcis2 = set(i for i, bc in enumerate(bcs) if adj2 & bc)
+                    if bcis1 & bcis2:
+                        continue
+                    p = set(self._graph.shortestPath(v1, v2, component))
+                    ends = reduce(set.union, (bcs[i] for i in (bcis1 | bcis2)))
+                    must = (p & seps) - ends
+                    if must & sepconflicts:
+                        return True
+                    sepconflicts.update(must)
+
             return False
 
         def takeNextFrame(self):
             assert not self.aborted
             if self._nextframes is None:
                 self._generateNextFrames()
-            return self._nextframes.pop(0)
+            return self._nextframes.popleft()
 
         def abort(self):
             assert self._nextframes is None
@@ -203,14 +274,16 @@ class FlowGraphSolver(object):
             if len(best[1]) > 1:
                 leafmoves = self._leafMoves(movesets)
                 if leafmoves:
-                    self._nextframes = [self.copy(move) for move in leafmoves]
+                    self._nextframes = \
+                        deque(self.copy(move) for move in leafmoves)
                     return
 
             # this sort tends to lead to less convoluted paths in solution
             vidx = best[0]
             moves = sorted(best[1], \
                 key=lambda v: len(self._graph.adjacencies(v, self._openverts)))
-            self._nextframes = [self.copy((vidx, to)) for to in moves]
+            self._nextframes = \
+                deque(self.copy((vidx, to)) for to in moves)
 
         def _possibleMoves(self):
             moves = {}  # vidx : set of vertices to move to
@@ -354,6 +427,10 @@ class FlowGraphSolver(object):
             if top.heuristicUnsolvable() or self._memo.find(top):
                 top.abort()
                 return False
+            #if top.biconnectedUnsolvable():
+                #self._memo.insert(top)
+                #top.abort()
+                #return False
             return True
         return False
 

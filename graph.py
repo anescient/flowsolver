@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
+from collections import deque
+
 
 class QueryableSimpleGraph(object):
     def __init__(self, edgeSets):
         self._edges = edgeSets
         # vertex : set of connected vertices (doubly-linked)
-        # keys are vertex collection (may have empty values)
+        # keys are vertex collection (isolated vertices have empty set)
 
         for v, adj in edgeSets.iteritems():
             assert v not in adj
@@ -18,78 +20,121 @@ class QueryableSimpleGraph(object):
         return iter(self._edges)
 
     def copyEdgeSets(self):
-        edgesets = self._edges.copy()
-        for v in edgesets:
-            edgesets[v] = edgesets[v].copy()
-        return edgesets
+        return dict((v, adj.copy()) for v, adj in self._edges.iteritems())
 
     def adjacent(self, v1, v2):
         """Return True iff v1 and v2 share an edge."""
         return v2 in self._edges[v1]
 
-    def adjacencies(self, v, vertices=None):
+    def adjacencies(self, v, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
             Return set of vertices adjacent to v. Never includes v.
+            mask: use only these vertices and their incident edges
         """
-        if vertices is None:
+        if mask is None:
             return self._edges[v].copy()
         else:
-            return self._edges[v].intersection(vertices)
+            return self._edges[v].intersection(mask)
 
-    def connected(self, v1, v2, vertices=None):
+    def connected(self, v1, v2, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
             Return True iff there is some path from v1 to v2.
+            mask: use only these vertices and their incident edges
         """
         assert v1 != v2
         if v2 in self._edges[v1]:
             return True
-        openVerts = set(self.vertices if vertices is None else vertices)
-        openVerts.discard(v1)
-        openVerts.discard(v2)
-        front1 = self.adjacencies(v1, openVerts)
-        front2 = self.adjacencies(v2, openVerts)
+        toVisit = self._maskVertices(mask)
+        toVisit.discard(v1)
+        toVisit.discard(v2)
+        front1 = self.adjacencies(v1, toVisit)
+        front2 = self.adjacencies(v2, toVisit)
         if not front1 or not front2:
             return False
         flip = False
         while not front1.intersection(front2):
             if flip:
-                openVerts -= front1
-                front1 = set.union(\
-                    *(self.adjacencies(fv, openVerts) for fv in front1))
+                toVisit -= front1
+                front1 = reduce(set.union, \
+                    (self.adjacencies(fv, toVisit) for fv in front1))
                 if not front1:
                     return False
             else:
-                openVerts -= front2
-                front2 = set.union(\
-                    *(self.adjacencies(fv, openVerts) for fv in front2))
+                toVisit -= front2
+                front2 = reduce(set.union, \
+                    (self.adjacencies(fv, toVisit) for fv in front2))
                 if not front2:
                     return False
             flip = not flip
         return True
 
-    def isConnectedSet(self, vset, vertices=None):
+    def shortestPath(self, v1, v2, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
-            Return True iff all vertices in vset are connected.
+            Return a minimal list of vertices connecting v1 to v2.
+                path[0] == v1, path[-1] == v2
+            Return None if not connected.
+            mask: use only these vertices and their incident edges
         """
-        if len(vset) == 1:
+        if v1 == v2:
+            return [v1]
+        elif self.adjacent(v1, v2):
+            return [v1, v2]
+        mask_a = self._maskVertices(mask)
+        mask_a.discard(v1)
+        mask_a.discard(v2)
+        mask_b = mask_a.copy()
+        trees = {v1: None, v2: None}  # vertex: parent
+        leafs_a, leafs_b = set([v1]), set([v2])
+        join = None
+        while mask_a and join is None:
+            ext = None
+            leafs = set()
+            while leafs_a:
+                v = leafs_a.pop()
+                ext = self.adjacencies(v, mask_a)
+                mask_a -= ext
+                leafs |= ext
+                for v_ext in ext:
+                    if v_ext in leafs_b:
+                        join = (v_ext, v)
+                        break
+                    trees[v_ext] = v
+                else:
+                    continue
+                break
+            leafs_a = leafs
+            if ext is None:
+                break
+            mask_a, mask_b = mask_b, mask_a
+            leafs_a, leafs_b = leafs_b, leafs_a
+        if join is None:
+            return None
+        path1 = [join[0]]
+        path2 = [join[1]]
+        for path in (path1, path2):
+            while trees[path[-1]] is not None:
+                path.append(trees[path[-1]])
+        if path1[-1] == v2:
+            path1, path2 = path2, path1
+        path1.reverse()
+        path1.extend(path2)
+        return path1
+
+    def isConnectedSet(self, vertices, mask=None):
+        """
+            Return True iff all pairs from 'vertices' are connected.
+            mask: use only these vertices and their incident edges
+        """
+        if len(vertices) == 1:
             return True
-        elif len(vset) == 2:
-            it = iter(vset)
-            return self.connected(next(it), next(it), vertices)
-        openVerts = set(self.vertices if vertices is None else vertices)
-        openVerts |= vset
-        fronts = [self.adjacencies(v, openVerts) for v in vset]
-        if not all(fronts):
-            return False
-        openVerts -= vset
+        elif len(vertices) == 2:
+            it = iter(vertices)
+            return self.connected(next(it), next(it), mask)
+        toVisit = self._maskVertices(mask)
+        toVisit.update(vertices)
+        fronts = deque(set([v]) for v in vertices)
         while len(fronts) > 1:
-            front = fronts.pop(0)
+            front = fronts.popleft()
             joined = False
             for joinfront in fronts:
                 if front.intersection(joinfront):
@@ -97,53 +142,108 @@ class QueryableSimpleGraph(object):
                     joined = True
             if joined:
                 continue
-            openVerts -= front
-            front = set.union(\
-                *(self.adjacencies(fv, openVerts) for fv in front))
+            toVisit -= front
+            front = reduce(set.union, \
+                (self.adjacencies(v, toVisit) for v in front))
             if not front:
                 return False
             fronts.append(front)
         return True
 
-    def isSeparator(self, v, vertices=None):
+    def isSeparator(self, v, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
             Return True iff removing v will divide v's connected component.
+            mask: use only these vertices and their incident edges
         """
-        openVerts = set(self.vertices if vertices is None else vertices)
-        links = self.adjacencies(v, openVerts)
+        mask = self._maskVertices(mask)
+        links = self.adjacencies(v, mask)
         if len(links) < 2:
             return False
-        openVerts.discard(v)
-        return not self.isConnectedSet(links, openVerts)
+        mask.discard(v)
+        return not self.isConnectedSet(links, mask)
 
-    def connectedComponent(self, v, vertices=None):
+    def biconnectedComponents(self, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
-            Return set of vertices connected by some path to v (including v).
+            Return tuple(list(sets), set) containing the sets of vertices
+            in biconnected components and the set of articulation points.
+            mask: use only these vertices and their incident edges
         """
-        openVerts = set(self.vertices if vertices is None else vertices)
-        openVerts.add(v)
-        component = set()
-        toVisit = set([v])
+        vertices = self._maskVertices(mask)
+        subtrees = dict((v, set([v])) for v in vertices)
+        adjs = dict((v, self._edges[v] & vertices) for v in vertices)
+        components = []
+        separators = set()
+        toVisit = vertices.copy()
         while toVisit:
-            v = toVisit.pop()
-            component.add(v)
-            openVerts.remove(v)
-            toVisit |= self.adjacencies(v, openVerts)
+            root = toVisit.pop()
+            stack = [root]
+            depth = {root: 0}
+            lowpoint = {root: 0}
+            v_child = None
+            while stack:
+                v = stack[-1]
+
+                adj = adjs[v]
+                v_next = None
+                while v_next is None and adj:
+                    v_next = adj.pop()
+                    if v_next not in toVisit:
+                        v_next = None
+
+                if v_next is None:
+                    stack.pop()
+                    v_parent = stack[-1] if stack else None
+                    for v_adj in self.adjacencies(v, vertices):
+                        if v_adj != v_parent:
+                            lowpoint[v] = min(lowpoint[v], depth[v_adj])
+                else:
+                    lowpoint[v_next] = depth[v_next] = len(stack)
+                    toVisit.remove(v_next)
+                    stack.append(v_next)
+
+                if v_child is not None:
+                    lowpoint[v] = min(lowpoint[v], lowpoint[v_child])
+                    if stack and lowpoint[v_child] >= depth[v]:
+                        separators.add(v)
+                        c = subtrees[v_child]
+                        c.add(v)
+                        components.append(c)
+                    else:
+                        subtrees[v] |= subtrees[v_child]
+                    del subtrees[v_child]
+
+                v_child = v if v_next is None else None
+
+            components.append(subtrees[root])
+            del subtrees[root]
+        assert not subtrees
+        return (components, separators)
+
+    def connectedComponent(self, v, mask=None):
+        """
+            Return set of vertices connected by some path to v (including v).
+            mask: use only these vertices and their incident edges
+        """
+        toVisit = self._maskVertices(mask)
+        toVisit.add(v)
+        component = set([v])
+        stack = [v]
+        while stack:
+            v = stack.pop()
+            ext = self.adjacencies(v, toVisit)
+            toVisit -= ext
+            component |= ext
+            stack.extend(ext)
         return component
 
-    def disjointPartitions(self, vertices=None):
+    def disjointPartitions(self, mask=None):
         """
-            vertices: use only these vertices and their incident edges
-                      if None, use all vertices in graph
-            Return list of sets of vertices.
-            Vertices in each set are connected.
-            Sets are not connected to each other.
+            Return list of sets of vertices such that:
+                All vertices in each set are connected.
+                No two sets are connected to each other.
+            mask: use only these vertices and their incident edges
         """
-        toVisit = set(self.vertices if vertices is None else vertices)
+        toVisit = self._maskVertices(mask)
         partitions = []
         while toVisit:
             p = self.connectedComponent(toVisit.pop(), toVisit)
@@ -151,12 +251,20 @@ class QueryableSimpleGraph(object):
             partitions.append(p)
         return partitions
 
+    def _maskVertices(self, mask=None):
+        """
+            Return a new set containing the graph's vertices.
+            mask: use only these vertices, or all vertices if None
+        """
+        return set(self._edges if mask is None else mask)
+
 
 class SimpleGraph(QueryableSimpleGraph):
-    def __init__(self):
-        super(SimpleGraph, self).__init__({})
+    def __init__(self, edgeSets=None):
+        super(SimpleGraph, self).__init__(edgeSets or {})
 
     def asReadOnly(self):
+        """Return a read-only interface to this instance."""
         return QueryableSimpleGraph(self._edges)
 
     def pushVertex(self):
@@ -166,7 +274,7 @@ class SimpleGraph(QueryableSimpleGraph):
         return v
 
     def removeVertex(self, v):
-        """Delete a vertex and any related edges."""
+        """Delete a vertex and any incident edges."""
         for adj in self._edges[v]:
             self._edges[adj].remove(v)
         del self._edges[v]
@@ -179,13 +287,13 @@ class SimpleGraph(QueryableSimpleGraph):
         self._edges[v2].add(v1)
 
     def removeEdge(self, v1, v2):
-        """Disconnect v1 and v2. Error if not connected."""
+        """Delete edge between v1 and v2. Error if no such edge."""
         assert v1 != v2
         self._edges[v1].remove(v2)
         self._edges[v2].remove(v1)
 
 
-def _test():
+def _testGraph():
     g = SimpleGraph()
     assert isinstance(g, QueryableSimpleGraph)
     assert not isinstance(g.asReadOnly(), SimpleGraph)
@@ -195,7 +303,7 @@ def _test():
         verts.append(g.pushVertex())
     assert len(set(verts)) == len(verts)
     for v in verts:
-        assert len(g.adjacencies(v)) == 0
+        assert not g.adjacencies(v)
         assert g.connectedComponent(v) == set([v])
         assert not g.isSeparator(v)
         assert g.isConnectedSet([v])
@@ -216,26 +324,51 @@ def _test():
             assert g.connectedComponent(verts[j]) == set(verts[:i + 2])
     for v in verts:
         assert g.connectedComponent(v) == set(verts)
+    assert g.isConnectedSet(verts)
+    assert g.isConnectedSet([verts[2], verts[4]], verts[2:5])
+    assert not g.isConnectedSet([verts[2], verts[4]], [verts[2], verts[4]])
+    assert g.isConnectedSet(verts[:4] + verts[5:])
+    assert not g.isConnectedSet(verts[:4] + verts[5:], verts[:4] + verts[5:])
     assert not g.isSeparator(verts[0])
     assert not g.isSeparator(verts[-1])
     assert all(g.isSeparator(v) for v in verts[1:-1])
+    assert g.shortestPath(verts[0], verts[-1]) == verts
+    assert g.shortestPath(verts[-1], verts[0]) == list(reversed(verts))
+    assert g.shortestPath(verts[3], verts[3]) == [verts[3]]
+
+    shortcut = g.pushVertex()
+    g.addEdge(verts[0], shortcut)
+    g.addEdge(verts[-1], shortcut)
+    assert g.shortestPath(verts[0], verts[-1]) == \
+        [verts[0], shortcut, verts[-1]]
+
+    assert verts[0] == 0
+    g.removeEdge(verts[-1], shortcut)
+    assert g.shortestPath(shortcut, verts[1]) == [shortcut, verts[0], verts[1]]
+    g.removeVertex(shortcut)
+
     g.addEdge(verts[0], verts[-1])
+    assert g.shortestPath(verts[0], verts[-1]) == [verts[0], verts[-1]]
     assert not any(g.isSeparator(v) for v in verts)
     g.removeEdge(verts[0], verts[-1])
     g.asReadOnly()
-    parts = g.disjointPartitions(verts[:2] + verts[3:])
+    mask = verts[:2] + verts[3:]
+    parts = g.disjointPartitions(mask)
     assert len(parts) == 2
-    assert len(parts[0].intersection(parts[1])) == 0
+    assert not parts[0].intersection(parts[1])
     assert g.isConnectedSet(parts[0])
     assert g.isConnectedSet(parts[1])
-    assert not g.isConnectedSet(set(verts))
+    for v1 in parts[0]:
+        for v2 in parts[1]:
+            assert g.shortestPath(v1, v2, mask) is None
+    assert not g.isConnectedSet(mask, mask)
     assert verts[2] not in parts[0].union(parts[1])
     assert parts[0].union(parts[1]) == set(verts) - set(verts[2:3])
     drops = [verts[i] for i in [2, 5, 8]]
     for v in drops:
         g.removeVertex(v)
         verts.remove(v)
-    assert len(g.adjacencies(verts[-1])) == 0
+    assert not g.adjacencies(verts[-1])
     for v in verts[:-1]:
         assert len(g.adjacencies(v)) == 1
         assert not g.isSeparator(v)
@@ -254,7 +387,79 @@ def _test():
     assert g.isConnectedSet(set(verts[:1] + verts[-1:]))
 
 
+def _testGraphBiconnected():
+    edgesets = [{\
+        0: set([]), 2: set([3, 13]), 3: set([2, 4, 14]), 4: set([3, 15]), \
+        13: set([2, 14]), 14: set([25, 3, 13, 15]), 15: set([4, 14]), \
+        17: set([18, 28]), 18: set([17, 29]), 22: set([23]), \
+        23: set([34, 22]), 25: set([36, 14]), 28: set([17, 29, 39]), \
+        29: set([18, 28]), 34: set([35, 45, 23]), 35: set([34, 36]), \
+        36: set([25, 35, 37, 47]), 37: set([36, 38]), 38: set([37, 39]), \
+        39: set([28, 38]), 42: set([119]), 44: set([45]), 45: set([34, 44]), \
+        47: set([58, 36]), 52: set([120, 63]), 54: set([120, 65]), \
+        57: set([58, 68]), 58: set([57, 59, 47]), 59: set([58, 70]), \
+        63: set([52, 118]), 65: set([118, 54]), 66: set([77]), \
+        68: set([57, 79]), 70: set([81, 59]), 72: set([]), 75: set([117]), \
+        77: set([66]), 79: set([80, 68]), 80: set([81, 91, 79]), \
+        81: set([80, 70]), 84: set([95]), 91: set([80, 102]), \
+        94: set([105, 95]), 95: set([96, 106, 84, 94]), 96: set([95]), \
+        99: set([100]), 100: set([99, 111]), 102: set([91]), \
+        104: set([105, 115]), 105: set([104, 106, 116, 94]), \
+        106: set([105, 95]), 111: set([100]), 115: set([104, 116]), \
+        116: set([105, 115]), 117: set([75, 119]), 118: set([65, 63]), \
+        119: set([42, 117]), 120: set([52, 54])},
+
+        {2: set([3]), 3: set([2, 4, 10]), 4: set([3]), 10: set([17, 3]), \
+        14: set([21]), 16: set([17, 23]), 17: set([16, 24, 10, 18]), \
+        18: set([17, 25]), 20: set([27]), 21: set([28, 22, 14]), \
+        22: set([21, 23]), 23: set([16, 24, 30, 22]), \
+        24: set([17, 31, 25, 23]), 25: set([24, 32, 18, 26]), \
+        26: set([25, 27]), 27: set([26, 20, 34]), 28: set([21]), \
+        30: set([31, 23]), 31: set([24, 32, 38, 30]), 32: set([25, 31]), \
+        34: set([27]), 38: set([45, 31]), 44: set([45]), \
+        45: set([44, 46, 38]), 46: set([45])}]
+    for es in edgesets:
+        g = SimpleGraph(es)
+        verts = set(g.vertices)
+        while verts:
+            assert set(es) == verts
+            bcs, seps = g.biconnectedComponents()
+            assert reduce(set.union, bcs) == verts
+            innerbcs = [bc - seps for bc in bcs]
+            assert sum(map(len, innerbcs)) + len(seps) == len(verts)
+            memberbcs = dict((v, set()) for v in verts)
+            for i, bc in enumerate(bcs):
+                for v in bc:
+                    memberbcs[v].add(i)
+            parts = g.disjointPartitions()
+            for v in verts:
+                novparts = g.disjointPartitions(verts - set([v]))
+                if g.isSeparator(v):
+                    assert v in seps
+                    assert len(memberbcs[v]) > 1
+                    assert g.isSeparator(v)
+                    assert len(novparts) == len(parts) + len(memberbcs[v]) - 1
+                else:
+                    assert v not in seps
+                    assert len(memberbcs[v]) == 1
+                    assert not g.isSeparator(v)
+                    if len(g.connectedComponent(v)) == 1:
+                        assert len(novparts) == len(parts) - 1
+                    else:
+                        assert len(novparts) == len(parts)
+            for bc in bcs:
+                bcs_, seps_ = g.biconnectedComponents(bc)
+                assert len(bcs_) == 1
+                assert bcs_[0] == bc
+                assert not seps_
+                for v in bc:
+                    assert bc.issubset(g.connectedComponent(v))
+                    assert bc == g.connectedComponent(v, bc)
+            g.removeVertex(verts.pop())
+
+
 if __name__ == '__main__':
-    _test()
+    _testGraph()
+    _testGraphBiconnected()
     print "Tests passed."
     exit(0)

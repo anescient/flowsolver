@@ -54,8 +54,7 @@ class FlowBoard(object):
         l = self._endpoints[key] if key in self._endpoints else []
         l.append(cell)
         if len(l) > 2:
-            l.pop(0)
-            assert len(l) == 2
+            l = l[-2:]
         self._endpoints[key] = l
 
     def endpointKeyAt(self, cell):
