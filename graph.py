@@ -42,31 +42,18 @@ class QueryableSimpleGraph(object):
             mask: use only these vertices and their incident edges
         """
         assert v1 != v2
-        if v2 in self._edges[v1]:
+        if self.adjacent(v1, v2):
             return True
         toVisit = self._maskVertices(mask)
-        toVisit.discard(v1)
-        toVisit.discard(v2)
-        front1 = self.adjacencies(v1, toVisit)
-        front2 = self.adjacencies(v2, toVisit)
-        if not front1 or not front2:
-            return False
-        flip = False
-        while not front1.intersection(front2):
-            if flip:
-                toVisit -= front1
-                front1 = reduce(set.union, \
-                    (self.adjacencies(fv, toVisit) for fv in front1))
-                if not front1:
-                    return False
-            else:
-                toVisit -= front2
-                front2 = reduce(set.union, \
-                    (self.adjacencies(fv, toVisit) for fv in front2))
-                if not front2:
-                    return False
-            flip = not flip
-        return True
+        front1, front2 = set([v1]), set([v2])
+        while front1:
+            toVisit -= front1
+            front1 = reduce(set.union, \
+                (self.adjacencies(v, toVisit) for v in front1))
+            if front1.intersection(front2):
+                return True
+            front1, front2 = front2, front1
+        return False
 
     def shortestPath(self, v1, v2, mask=None):
         """
@@ -87,7 +74,6 @@ class QueryableSimpleGraph(object):
         leafs_a, leafs_b = set([v1]), set([v2])
         join = None
         while mask_a and join is None:
-            ext = None
             leafs = set()
             while leafs_a:
                 v = leafs_a.pop()
@@ -102,15 +88,13 @@ class QueryableSimpleGraph(object):
                 else:
                     continue
                 break
-            leafs_a = leafs
-            if ext is None:
+            if not leafs:
                 break
+            leafs_a, leafs_b = leafs_b, leafs
             mask_a, mask_b = mask_b, mask_a
-            leafs_a, leafs_b = leafs_b, leafs_a
         if join is None:
             return None
-        path1 = [join[0]]
-        path2 = [join[1]]
+        path1, path2 = [join[0]], [join[1]]
         for path in (path1, path2):
             while trees[path[-1]] is not None:
                 path.append(trees[path[-1]])
@@ -318,9 +302,11 @@ def _testGraph():
         g.addEdge(verts[i], verts[i + 1])
         for v in verts[i + 2:]:
             assert not g.connected(verts[i + 1], v)
+            assert not g.connected(v, verts[i + 1])
         for j in xrange(i + 1):
             if j > 0:
                 assert g.connected(verts[0], verts[j])
+                assert g.connected(verts[j], verts[0])
             assert g.connectedComponent(verts[j]) == set(verts[:i + 2])
     for v in verts:
         assert g.connectedComponent(v) == set(verts)
