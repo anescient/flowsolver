@@ -198,10 +198,52 @@ class FlowGraphSolver(object):
                 if x == 1:
                     return True
 
-            # TODO biconnected components
-            # check if any biconnected component cannot be covered
-            # check if any cut vertex must be used by more than one pair
+            return False
 
+        def biconnectedUnsolvable(self):
+            for k, component in self._components.iteritems():
+                bcs, seps = self._graph.biconnectedComponents(component)
+                if not seps:
+                    continue
+
+                # check if any biconnected component cannot be covered
+                leafbcis = set()
+                for i, bc in enumerate(bcs):
+                    if len(bc & seps) == 1:
+                        leafbcis.add(i)
+                for i in leafbcis:
+                    bc = bcs[i]
+                    for pairi, (v1, v2) in enumerate(self._headpairs):
+                        if k not in self._commoncomponents[pairi]:
+                            continue
+                        adj1 = self._graph.adjacencies(v1)
+                        if adj1 & bc:
+                            break
+                        adj2 = self._graph.adjacencies(v2)
+                        if adj2 & bc:
+                            break
+                    else:
+                        return True
+
+                # check if any cut vertex must be used by more than one pair
+                sepconflicts = set()
+                for pairi, (v1, v2) in enumerate(self._headpairs):
+                    if k not in self._commoncomponents[pairi]:
+                        continue
+                    if len(self._commoncomponents[pairi]) > 1:
+                        continue
+                    adj1 = self._graph.adjacencies(v1)
+                    adj2 = self._graph.adjacencies(v2)
+                    bcis1 = set(i for i, bc in enumerate(bcs) if adj1 & bc)
+                    bcis2 = set(i for i, bc in enumerate(bcs) if adj2 & bc)
+                    if bcis1 & bcis2:
+                        continue
+                    p = set(self._graph.shortestPath(v1, v2, component))
+                    ends = reduce(set.union, (bcs[i] for i in (bcis1 | bcis2)))
+                    must = (p & seps) - ends
+                    if must & sepconflicts:
+                        return True
+                    sepconflicts.update(must)
             return False
 
         def takeNextFrame(self):
@@ -382,6 +424,10 @@ class FlowGraphSolver(object):
             self._stack.append(top)
             self._totalframes += 1
             if top.heuristicUnsolvable() or self._memo.find(top):
+                top.abort()
+                return False
+            if top.biconnectedUnsolvable():
+                self._memo.insert(top)
                 top.abort()
                 return False
             return True
