@@ -83,30 +83,42 @@ class QueryableSimpleGraph(object):
         mask_a.discard(v1)
         mask_a.discard(v2)
         mask_b = mask_a.copy()
-        tree_a = tree1 = Tree(v1)
-        tree_b = tree2 = Tree(v2)
+        trees = {v1: None, v2: None}  # vertex: parent
+        leafs_a, leafs_b = set([v1]), set([v2])
         join = None
         while mask_a and join is None:
             ext = None
-            for v in tree_a.unmarkedLeafs:
-                tree_a.mark(v)
+            leafs = set()
+            while leafs_a:
+                v = leafs_a.pop()
                 ext = self.adjacencies(v, mask_a)
                 mask_a -= ext
+                leafs |= ext
                 for v_ext in ext:
-                    tree_a.add(v_ext, v)
-                    if tree_b.hasLeaf(v_ext):
-                        join = v_ext
+                    if v_ext in leafs_b:
+                        join = (v_ext, v)
                         break
+                    trees[v_ext] = v
                 else:
                     continue
                 break
+            leafs_a = leafs
             if ext is None:
                 break
-            tree_a, tree_b = tree_b, tree_a
             mask_a, mask_b = mask_b, mask_a
+            leafs_a, leafs_b = leafs_b, leafs_a
         if join is None:
             return None
-        return tree1.pathFromRoot(join) + tree2.pathToRoot(tree2.parent(join))
+        path1 = [join[0]]
+        path2 = [join[1]]
+        for path in (path1, path2):
+            while trees[path[-1]] is not None:
+                path.append(trees[path[-1]])
+        if path1[-1] == v2:
+            path1, path2 = path2, path1
+        path1.reverse()
+        path1.extend(path2)
+        return path1
 
     def isConnectedSet(self, vertices, mask=None):
         """
@@ -281,88 +293,6 @@ class SimpleGraph(QueryableSimpleGraph):
         self._edges[v2].remove(v1)
 
 
-class Tree(object):
-    def __init__(self, root):
-        self._root = root
-        self._nodes = {}  # vertex : (parent, depth)
-        self._nodes[root] = (None, 0)
-        self._leafs = set([root])
-        self._marked = set()
-
-    @property
-    def root(self):
-        return self._root
-
-    @property
-    def vertices(self):
-        return iter(self._nodes)
-
-    @property
-    def leafs(self):
-        return iter(self._leafs)
-
-    @property
-    def unmarkedLeafs(self):
-        return self._leafs - self._marked
-
-    @property
-    def edges(self):
-        for v, (pv, _) in self._nodes.iteritems():
-            if pv is not None:
-                yield (pv, v)
-
-    def __contains__(self, v):
-        return v in self._nodes
-
-    def hasLeaf(self, v):
-        return v in self._leafs
-
-    def add(self, v, parent):
-        assert v not in self._nodes
-        self._nodes[v] = (parent, self.depthOf(parent) + 1)
-        self._leafs.discard(parent)
-        self._leafs.add(v)
-
-    def mark(self, v):
-        assert v in self._nodes
-        self._marked.add(v)
-
-    def depthOf(self, v):
-        return self._nodes[v][1]
-
-    def parent(self, v):
-        return self._nodes[v][0]
-
-    def findPath(self, v1, v2):
-        assert v1 in self._nodes
-        assert v2 in self._nodes
-        path1 = [v1]  # path from v1 toward root
-        path2 = [v2]  # path from v2 toward root
-        depth1 = self.depthOf(v1)
-        depth2 = self.depthOf(v2)
-        while path1[-1] != path2[-1]:
-            if depth1 >= depth2:
-                path1.append(self.parent(path1[-1]))
-                depth1 -= 1
-            if depth1 < depth2:
-                path2.append(self.parent(path2[-1]))
-                depth2 -= 1
-        path2.pop()
-        path1.extend(reversed(path2))
-        return path1
-
-    def pathToRoot(self, v):
-        path = [v]
-        while path[-1] != self._root:
-            path.append(self.parent(path[-1]))
-        return path
-
-    def pathFromRoot(self, v):
-        path = self.pathToRoot(v)
-        path.reverse()
-        return path
-
-
 def _testGraph():
     g = SimpleGraph()
     assert isinstance(g, QueryableSimpleGraph)
@@ -528,56 +458,8 @@ def _testGraphBiconnected():
             g.removeVertex(verts.pop())
 
 
-def _testTree():
-    t = Tree(1)
-    assert t.root == 1
-    assert 1 in t
-    assert t.depthOf(1) == 0
-    assert t.parent(1) is None
-    assert t.findPath(1, 1) == [1]
-    assert set(t.leafs) == set([1])
-    assert set(t.leafs) == set(t.unmarkedLeafs)
-    assert t.hasLeaf(1)
-    t.mark(1)
-    assert len(t.unmarkedLeafs) == 0
-    t.add(2, 1)
-    assert not t.hasLeaf(1)
-    assert set(t.leafs) == set([2])
-    assert t.depthOf(2) == 1
-    assert t.parent(2) == 1
-    t.add(3, 1)
-    assert t.findPath(2, 3) == [2, 1, 3]
-    t.add(4, 2)
-    t.add(5, 3)
-    assert set(t.leafs) == set([4, 5])
-    assert t.findPath(4, 5) == [4, 2, 1, 3, 5]
-    assert t.findPath(2, 5) == [2, 1, 3, 5]
-    assert t.findPath(4, 3) == [4, 2, 1, 3]
-    t.add(6, 2)
-    t.add(7, 2)
-    t.add(9, 7)
-    t.mark(5)
-    assert set(t.leafs) == set([4, 5, 6, 9])
-    assert set(t.unmarkedLeafs) == set([4, 6, 9])
-    assert t.findPath(6, 3) == [6, 2, 1, 3]
-    assert t.findPath(3, 6) == [3, 1, 2, 6]
-    assert t.findPath(6, 9) == [6, 2, 7, 9]
-    assert t.findPath(9, 6) == [9, 7, 2, 6]
-    assert t.findPath(9, 1) == t.pathToRoot(9)
-    assert not t.hasLeaf(-1)
-    for v in t.vertices:
-        assert v in t
-        assert t.hasLeaf(v) == (v in t.leafs)
-        rp = t.pathToRoot(v)
-        assert rp == list(reversed(t.pathFromRoot(v)))
-        assert t.depthOf(v) == len(rp) - 1
-        for a, b in zip(rp, rp[1:]):
-            assert t.parent(a) == b
-
-
 if __name__ == '__main__':
     _testGraph()
     _testGraphBiconnected()
-    _testTree()
     print "Tests passed."
     exit(0)
