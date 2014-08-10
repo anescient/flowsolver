@@ -447,11 +447,12 @@ class FlowGraphSolver(object):
         if self.done:
             return True
         while self._stack:
+            step = False
             while self.step():
-                pass
+                step = True
             if self._stack[-1].isSolved():
                 return True
-            if limit is not None:
+            if step and limit is not None:
                 limit -= 1
                 if limit <= 0:
                     return False
