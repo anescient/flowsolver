@@ -8,6 +8,7 @@ from PyQt4.QtGui import QPushButton, QDialog, QStatusBar, QLayout, \
     QBoxLayout, QWidget, QPen, QColor
 from flowboard import FlowBoardGraph
 from flowpainter import SpacedGrid, FlowBoardPainter, FlowPalette
+from flowsolver import FlowBoardSolver
 
 
 class TestWidget(QWidget):
@@ -150,3 +151,15 @@ class TestPopup(QDialog):
     @pyqtSlot(bool)
     def _abortClicked(self, _):
         self.close()
+
+
+def TestSolve(boardfile):
+    import pickle
+    from timeit import timeit
+    board = pickle.load(open(boardfile, 'rb'))
+    solver = FlowBoardSolver(board)
+    print "running"
+    print
+    seconds = timeit(solver.run, number=1)
+    solver.printStats()
+    print "{0:.2f} seconds".format(seconds)

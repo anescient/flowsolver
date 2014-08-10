@@ -7,7 +7,7 @@ from PyQt4.QtGui import QApplication, QMainWindow, QColor, QPushButton, \
 from QSquareWidget import QSquareWidgetContainer
 from flowboardeditor import FlowBoardEditor
 from flowsolverwidget import FlowSolverWidget
-from testbench import TestPopup
+from testbench import TestPopup, TestSolve
 
 
 class FlowSolverAppWindow(QMainWindow):
@@ -173,6 +173,11 @@ class FlowSolvingPopup(QDialog):
 
 if __name__ == '__main__':
     import sys
+    if '-bench' in sys.argv:
+        assert sys.argv[1] == '-bench'
+        assert len(sys.argv) == 3
+        TestSolve(sys.argv[2])
+        sys.exit(0)
     app = QApplication(sys.argv)
     main = FlowSolverAppWindow()
     main.show()
