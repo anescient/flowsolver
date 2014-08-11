@@ -370,18 +370,6 @@ class FlowGraphSolver(object):
             self._hits = 0
             self._limit = 20000
 
-        @property
-        def inserts(self):
-            return self._inserts
-
-        @property
-        def hitRate(self):
-            return 0 if self._hits == 0 else self._hits / float(self._finds)
-
-        @property
-        def returnRate(self):
-            return 0 if self._hits == 0 else self._hits / float(self._inserts)
-
         def insert(self, frame):
             self._inserts += 1
             if len(self._memo) >= self._limit:
@@ -395,6 +383,14 @@ class FlowGraphSolver(object):
                 self._hits += 1
                 self._memo[frame.coverState] = self._finds
             return hit
+
+        def stats(self):
+            stats = "{0} inserts".format(self._inserts)
+            if self._inserts > 0:
+                stats += ", {0:.2%} hit, {1:.2%} return".format(\
+                    self._hits / float(self._finds), \
+                    self._hits / float(self._inserts))
+            return stats
 
         def _prune(self, limit):
             keep = islice(\
@@ -462,11 +458,7 @@ class FlowGraphSolver(object):
 
     def printStats(self):
         print "{0} visited".format(self._totalframes)
-        memorates = ""
-        if self._memo.inserts > 0:
-            memorates = ", {0:.2%} hit, {1:.2%} return".format(\
-                self._memo.hitRate, self._memo.returnRate)
-        print "memo: {0} inserts".format(self._memo.inserts) + memorates
+        print "memo: " + self._memo.stats()
         if self.solved:
             flows = []
             for f in self.__getFlows():
