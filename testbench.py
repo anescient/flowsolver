@@ -19,6 +19,7 @@ class TestWidget(QWidget):
         self._board = None
         self._grid = None
         self._graph = None
+        self._solver = None
         self._marks = None
         self._parts = None
         self._paths = None
@@ -30,6 +31,7 @@ class TestWidget(QWidget):
         self._grid = SpacedGrid(\
             self._board.size, self._board.size, self.rect().size(), 2)
         self._graph = FlowBoardGraph(board)
+        self._solver = FlowBoardSolver(board) if board.isValid() else None
         self._marks = []
         self._parts = []
         self._paths = []
@@ -50,6 +52,10 @@ class TestWidget(QWidget):
         ptr.fillBackground()
         ptr.drawGrid(self._grid)
         ptr.drawBoardFeatures(self._grid, self._board)
+        if self._solver:
+            for key, cells in self._solver.getFlows():
+                if len(cells) > 1:
+                    ptr.drawFlow(self._grid, key, cells)
         if self._marks:
             for v in self._marks:
                 r = self._grid.cellRect(self._graph.vertexToCell(v))
@@ -68,16 +74,20 @@ class TestWidget(QWidget):
         if self._edges:
             self._drawEdges(ptr, self._edges)
         if self._trees:
-            self._edges = self._edges or []
             for t in self._trees:
-                self._drawEdges(ptr, t.edges, True)
+                edges = []
+                for v in t:
+                    pv = t[v]
+                    if pv is not None:
+                        edges.append((pv, v))
+                self._drawEdges(ptr, edges, True)
         ptr.end()
 
     def sizeHint(self):
         return QSize(self._size, self._size)
 
     def _drawEdges(self, ptr, edges, directed=False):
-        c = QColor(255, 255, 255)
+        c = QColor(255, 255, 255, 100)
         ptr.setPen(QPen(c, 2))
         for _, edge in enumerate(edges):
             #c.setHslF(0.1 * float(i % 10), 0.8, 0.5)
@@ -87,10 +97,11 @@ class TestWidget(QWidget):
             line = QLineF(QLine(p2, p1))
             ptr.drawLine(line)
             if directed:
-                line.setAngle(line.angle() + 10)
-                line.setLength(line.length() * 0.25)
+                a = line.angle()
+                line.setLength(self._grid.minDimension * 0.3)
+                line.setAngle(a + 15)
                 ptr.drawLine(line)
-                line.setAngle(line.angle() - 20)
+                line.setAngle(a - 15)
                 ptr.drawLine(line)
 
     def _markVerts(self, ptr, key, verts):
