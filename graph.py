@@ -292,6 +292,9 @@ class OnlineReducedGraph(object):
             self._componentMap, \
             self._biconComponentMap, \
             self._separatorMap = state
+        self._c_k_deleted = None
+        self._c_k_reduced = None
+        self._c_kset_new = None
 
     def copy(self):
         return OnlineReducedGraph(self._graph, (\
@@ -304,6 +307,44 @@ class OnlineReducedGraph(object):
             self._biconComponentMap, \
             self._separatorMap))
 
+    @property
+    def componentDeleted(self):
+        return self._c_k_deleted
+
+    @property
+    def componentReduced(self):
+        return self._c_k_reduced
+
+    @property
+    def newSubComponents(self):
+        return self._c_kset_new
+
+    @property
+    def allMasked(self):
+        return not self._vertices
+
+    @property
+    def disjoint(self):
+        return len(self._components) > 1
+
+    @property
+    def vertices(self):
+        return self._vertices
+
+    @property
+    def components(self):
+        return self._components
+
+    def leafComponents(self):
+        """
+            Return sets of vertices from biconnected components having
+            only one separator, minus the separator.
+        """
+        for bc_k, bc in self._biconComponents.iteritems():
+            seps = self._separatorMap[bc_k]
+            if len(seps) == 1:
+                yield bc - seps
+
     def maskVertex(self, v):
         self._vertices = self._vertices.copy()
         self._vertices.remove(v)
@@ -312,30 +353,30 @@ class OnlineReducedGraph(object):
         self._components = self._components.copy()
         self._componentMap = self._componentMap.copy()
         c_k = self._componentMap.pop(v)
-        c_k_deleted = None
-        c_k_reduced = None
-        c_kset_new = None
+        self._c_k_deleted = None
+        self._c_k_reduced = None
+        self._c_kset_new = None
         c = self._components[c_k]
         if len(c) == 1:
-            c_k_deleted = c_k
+            self._c_k_deleted = c_k
             del self._components[c_k]
         else:
             c = c.copy()
             c.remove(v)
             if v in self._separators:
-                c_k_deleted = c_k
+                self._c_k_deleted = c_k
                 del self._components[c_k]
-                c_kset_new = set()
+                self._c_kset_new = set()
                 for c_new in self._graph.disjointPartitions(c):
                     c_k_new = next(self._keys)
                     self._components[c_k_new] = c_new
                     for cv in c_new:
                         assert self._componentMap[cv] != c_k_new
                         self._componentMap[cv] = c_k_new
-                    c_kset_new.add(c_k_new)
-                assert len(c_kset_new) > 1
+                    self._c_kset_new.add(c_k_new)
+                assert len(self._c_kset_new) > 1
             else:
-                c_k_reduced = c_k
+                self._c_k_reduced = c_k
                 self._components[c_k] = c
         # self._components valid
         # self._componentMap valid
@@ -344,8 +385,8 @@ class OnlineReducedGraph(object):
         self._biconComponentMap = self._biconComponentMap.copy()
         bc_kset = self._biconComponentMap.pop(v)
         biconReduce = []
-        if c_k_deleted:
-            if c_kset_new:
+        if self._c_k_deleted:
+            if self._c_kset_new:
                 assert len(bc_kset) > 1
                 for bc_k in bc_kset:
                     biconReduce.append(\
@@ -360,7 +401,7 @@ class OnlineReducedGraph(object):
                 self._separatorMap = self._separatorMap.copy()
                 del self._separatorMap[bc_k]
         else:
-            assert c_k_reduced
+            assert self._c_k_reduced
             assert v not in self._separators
             assert len(bc_kset) == 1
             bc_k = next(iter(bc_kset))
@@ -411,6 +452,13 @@ class OnlineReducedGraph(object):
                         seps.remove(v)
                         self._separatorMap[bc_k] = seps
 
+    def adjacencies(self, v):
+        return self._graph.adjacencies(v, self._vertices)
+
+    def componentsAdjacencies(self, v, kset):
+        mask = reduce(set.union, map(self._components.get, kset))
+        return self._graph.adjacencies(v, mask)
+
     def isSeparator(self, v):
         return v in self._separators
 
@@ -422,6 +470,12 @@ class OnlineReducedGraph(object):
 
     def disjointPartitions(self):
         return self._components.values()
+
+    def adjacentComponents(self, v):
+        c_kset = set()
+        for av in self._graph.adjacencies(v, self._vertices):
+            c_kset.add(self._componentMap[av])
+        return c_kset
 
     def assertIntegrity(self):
         assert self._vertices == set(self._componentMap)

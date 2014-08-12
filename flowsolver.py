@@ -3,18 +3,18 @@
 from collections import deque
 from itertools import islice, chain, izip
 from flowboard import FlowBoardGraph
+from graph import OnlineReducedGraph
 
 
 class FlowGraphSolver(object):
 
     class _Frame(object):
 
-        def __init__(self, graph, headpairs, \
-                     openverts, components, commoncomponents):
+        def __init__(self, graph, reducedgraph, \
+                     headpairs, commoncomponents):
             self._graph = graph
+            self._reducedgraph = reducedgraph
             self._headpairs = headpairs
-            self._openverts = openverts
-            self._components = components
             self._commoncomponents = commoncomponents
             self._nextframes = None
             self._aborted = False
@@ -49,16 +49,16 @@ class FlowGraphSolver(object):
             """
             if self._coverstate is None:
                 self._coverstate = (frozenset(self._headpairs),
-                                    frozenset(self._openverts))
+                                    frozenset(self._reducedgraph.vertices))
             return self._coverstate
 
         def isSolved(self):
-            return not self._openverts and not self._headpairs
+            return self._reducedgraph.allMasked and not self._headpairs
 
         def copy(self, move=None):
             frame = self.__class__(\
-                self._graph, self._headpairs, \
-                self._openverts, self._components, self._commoncomponents)
+                self._graph, self._reducedgraph, \
+                self._headpairs, self._commoncomponents)
             if move:
                 frame.applyMove(*move)
             return frame
@@ -78,22 +78,24 @@ class FlowGraphSolver(object):
             else:
                 self._headpairs[pairidx] = \
                     (to, other) if to < other else (other, to)
+                self._reducedgraph = self._reducedgraph.copy()
                 self._closeVertex(to)
 
                 toadj = self._graph.adjacencies(to)
                 common = None
                 for k in self._commoncomponents[pairidx]:
-                    if not toadj & self._components[k]:
+                    if not toadj & self._reducedgraph.components[k]:
                         if common is None:
                             common = self._commoncomponents[pairidx].copy()
                         common.remove(k)
                 if common is not None:
                     self._commoncomponents[pairidx] = common
 
-            if len(self._components) > 1:
+            if self._reducedgraph.disjoint:
                 # if any component is usable by only one pair,
                 # commit that pair to that component
-                componentusers = dict((k, set()) for k in self._components)
+                componentusers = \
+                    dict((k, set()) for k in self._reducedgraph.components)
                 for i, cc in enumerate(self._commoncomponents):
                     for k in cc:
                         componentusers[k].add(i)
@@ -113,36 +115,14 @@ class FlowGraphSolver(object):
                         del componentusers[k]
 
         def _closeVertex(self, v):
-            self._openverts = self._openverts.copy()
-            self._openverts.remove(v)
-            self._components = self._components.copy()
-            k_deleted = None
-            k_reduced = None
-            subcomps = None
-            for k, c in self._components.iteritems():
-                if v in c:
-                    c = c.copy()
-                    c.remove(v)
-                    if c:
-                        if self._graph.isSeparator(v, c):
-                            newk = max(self._components) + 1
-                            del self._components[k]
-                            k_deleted = k
-                            subcomps = {}
-                            for newc in self._graph.disjointPartitions(c):
-                                subcomps[newk] = newc
-                                newk += 1
-                        else:
-                            self._components[k] = c
-                            k_reduced = k
-                    else:
-                        del self._components[k]
-                        k_deleted = k
-                    break
+            self._reducedgraph.maskVertex(v)
+            k_deleted = self._reducedgraph.componentDeleted
+            k_reduced = self._reducedgraph.componentReduced
+            subcomps = self._reducedgraph.newSubComponents
 
             if k_reduced is not None:
                 assert k_deleted is None and subcomps is None
-                reduced = self._components[k_reduced]
+                reduced = self._reducedgraph.components[k_reduced]
                 for i, (v1, v2) in enumerate(self._headpairs):
                     common = self._commoncomponents[i]
                     if k_reduced in common:
@@ -163,13 +143,11 @@ class FlowGraphSolver(object):
                         if subcomps:
                             adj1 = self._graph.adjacencies(v1)
                             adj2 = self._graph.adjacencies(v2)
-                            for k, c in subcomps.iteritems():
+                            for k in subcomps:
+                                c = self._reducedgraph.components[k]
                                 if adj1 & c and adj2 & c:
                                     common.add(k)
                         self._commoncomponents[i] = common
-
-            if subcomps:
-                self._components.update(subcomps)
 
         def heuristicUnsolvable(self):
             # check that all pairs can be connected and
@@ -180,70 +158,37 @@ class FlowGraphSolver(object):
                 if not common and not self._graph.adjacent(v1, v2):
                     return True
                 covered |= common
-            if len(covered) != len(self._components):
+            if len(covered) != len(self._reducedgraph.components):
                 return True
 
             # check if any open vertex is adjacent only to
             # one other open vertex or one path head
             if self._moveapplied:  # assume parent frames have been checked
-                checkverts = self._graph.adjacencies(self._moveapplied[0]) | \
-                             self._graph.adjacencies(self._moveapplied[1])
-                checkverts &= self._openverts
+                checkverts = \
+                    self._reducedgraph.adjacencies(self._moveapplied[0]) | \
+                    self._reducedgraph.adjacencies(self._moveapplied[1])
             else:
-                checkverts = self._openverts
-            active = self._openverts.union(chain(*self._headpairs))
+                checkverts = self._reducedgraph.vertices
+            active = self._reducedgraph.vertices.union(chain(*self._headpairs))
             for v in checkverts:
                 x = len(self._graph.adjacencies(v, active))
                 assert x > 0
                 if x == 1:
                     return True
 
-            return False
+            # check if any biconnected component cannot be covered
+            for c in self._reducedgraph.leafComponents():
+                for v1, v2 in self._headpairs:
+                    # TODO skip if leaf not in commoncomponents
+                    if self._graph.adjacencies(v1, c):
+                        break
+                    if self._graph.adjacencies(v2, c):
+                        break
+                else:
+                    return True
 
-        def biconnectedUnsolvable(self):
-            for k, component in self._components.iteritems():
-                bcs, seps = self._graph.biconnectedComponents(component)
-                if not seps:
-                    continue
+            # TODO check if any vertex must be used by more than one pair
 
-                # check if any biconnected component cannot be covered
-                leafbcis = set()
-                for i, bc in enumerate(bcs):
-                    if len(bc & seps) == 1:
-                        leafbcis.add(i)
-                for i in leafbcis:
-                    bc = bcs[i]
-                    for pairi, (v1, v2) in enumerate(self._headpairs):
-                        if k not in self._commoncomponents[pairi]:
-                            continue
-                        adj1 = self._graph.adjacencies(v1)
-                        if adj1 & bc:
-                            break
-                        adj2 = self._graph.adjacencies(v2)
-                        if adj2 & bc:
-                            break
-                    else:
-                        return True
-
-                # check if any cut vertex must be used by more than one pair
-                sepconflicts = set()
-                for pairi, (v1, v2) in enumerate(self._headpairs):
-                    if k not in self._commoncomponents[pairi]:
-                        continue
-                    if len(self._commoncomponents[pairi]) > 1:
-                        continue
-                    adj1 = self._graph.adjacencies(v1)
-                    adj2 = self._graph.adjacencies(v2)
-                    bcis1 = set(i for i, bc in enumerate(bcs) if adj1 & bc)
-                    bcis2 = set(i for i, bc in enumerate(bcs) if adj2 & bc)
-                    if bcis1 & bcis2:
-                        continue
-                    p = set(self._graph.shortestPath(v1, v2, component))
-                    ends = reduce(set.union, (bcs[i] for i in (bcis1 | bcis2)))
-                    must = (p & seps) - ends
-                    if must & sepconflicts:
-                        return True
-                    sepconflicts.update(must)
             return False
 
         def takeNextFrame(self):
@@ -280,7 +225,7 @@ class FlowGraphSolver(object):
             # this sort tends to lead to less convoluted paths in solution
             vidx = best[0]
             moves = sorted(best[1], \
-                key=lambda v: len(self._graph.adjacencies(v, self._openverts)))
+                key=lambda v: len(self._reducedgraph.adjacencies(v)))
             self._nextframes = \
                 deque(self.copy((vidx, to)) for to in moves)
 
@@ -289,10 +234,8 @@ class FlowGraphSolver(object):
             for pairidx, (v1, v2) in enumerate(self._headpairs):
                 common = self._commoncomponents[pairidx]
                 if common:
-                    openverts = reduce(set.union, \
-                        map(self._components.get, common))
-                    m1 = self._graph.adjacencies(v1, openverts)
-                    m2 = self._graph.adjacencies(v2, openverts)
+                    m1 = self._reducedgraph.componentsAdjacencies(v1, common)
+                    m2 = self._reducedgraph.componentsAdjacencies(v2, common)
                     if self._graph.adjacent(v1, v2):
                         m1.add(v2)
                         m2.add(v1)
@@ -311,8 +254,8 @@ class FlowGraphSolver(object):
             # it must be connected now via some adjacent path head
             allmoves = reduce(set.union, movesets.values(), set())
             leaf = None
-            for m in allmoves.intersection(self._openverts):
-                if len(self._graph.adjacencies(m, self._openverts)) < 2:
+            for m in allmoves.intersection(self._reducedgraph.vertices):
+                if len(self._reducedgraph.adjacencies(m)) < 2:
                     leaf = m
                     break
             if leaf is None:
@@ -329,20 +272,17 @@ class FlowGraphSolver(object):
             assert len(reduce(set.union, map(set, endpointpairs), set())) == \
                    2 * len(endpointpairs)
             headpairs = [tuple(sorted(ep)) for ep in endpointpairs]
-            openverts = set(graph.vertices)
-            openverts -= set(v for vp in endpointpairs for v in vp)
-            components = dict(enumerate(graph.disjointPartitions(openverts)))
+            reducedgraph = OnlineReducedGraph(graph)
+            for v1, v2 in headpairs:
+                reducedgraph.maskVertex(v1)
+                reducedgraph.maskVertex(v2)
             commoncomponents = []
             for v1, v2 in headpairs:
-                adj1 = graph.adjacencies(v1, openverts)
-                adj2 = graph.adjacencies(v2, openverts)
-                common = set()
-                for k, c in components.iteritems():
-                    if adj1 & c and adj2 & c:
-                        common.add(k)
+                common = reducedgraph.adjacentComponents(v1)
+                common &= reducedgraph.adjacentComponents(v2)
                 commoncomponents.append(common)
-            return cls(graph, headpairs, \
-                       openverts, components, commoncomponents)
+            return cls(graph, reducedgraph, \
+                       headpairs, commoncomponents)
 
         @staticmethod
         def recoverPaths(framestack):
@@ -420,10 +360,6 @@ class FlowGraphSolver(object):
             self._stack.append(top)
             self._totalframes += 1
             if top.heuristicUnsolvable() or self._memo.find(top):
-                top.abort()
-                return False
-            if top.biconnectedUnsolvable():
-                self._memo.insert(top)
                 top.abort()
                 return False
             return True
