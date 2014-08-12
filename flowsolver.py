@@ -275,9 +275,8 @@ class FlowGraphSolver(object):
                    2 * len(endpointpairs)
             headpairs = [tuple(sorted(ep)) for ep in endpointpairs]
             reducedgraph = OnlineReducedGraph(graph)
-            for v1, v2 in headpairs:
-                reducedgraph.maskVertex(v1)
-                reducedgraph.maskVertex(v2)
+            for v in chain(*headpairs):
+                reducedgraph.maskVertex(v)
             commoncomponents = []
             for v1, v2 in headpairs:
                 common = reducedgraph.adjacentComponents(v1)

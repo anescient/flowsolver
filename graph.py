@@ -369,44 +369,41 @@ class OnlineReducedGraph(object):
                     c_k_new = next(self._keys)
                     self._components[c_k_new] = c_new
                     self._c_kset_new.add(c_k_new)
-                assert len(self._c_kset_new) > 1
+                #assert len(self._c_kset_new) > 1
             else:
                 self._c_k_reduced = c_k
                 self._components[c_k] = c
         # self._components valid
 
         self._biconComponents = self._biconComponents.copy()
+        self._separatorMap = self._separatorMap.copy()
         self._biconComponentMap = self._biconComponentMap.copy()
-        bc_kset = self._biconComponentMap.pop(v)
-        biconReduce = []
+        bc_kset = self._biconComponentMap.pop(v).copy()
+        bc_kset_reduced = None
         if self._c_k_deleted:
             if self._c_kset_new:
-                assert len(bc_kset) > 1
-                for bc_k in bc_kset:
-                    biconReduce.append(\
-                        (bc_k, self._biconComponents[bc_k].copy()))
+                #assert len(bc_kset) > 1
+                bc_kset_reduced = bc_kset
             else:
-                assert len(bc_kset) == 1
-                bc_k = next(iter(bc_kset))
-                assert len(self._biconComponents[bc_k]) == 1
+                #assert len(bc_kset) == 1
+                #assert len(self._biconComponents[bc_k]) == 1
+                #assert v not in self._separators
+                #assert len(self._separatorMap[bc_k]) == 0
+                bc_k = bc_kset.pop()
                 del self._biconComponents[bc_k]
-                assert v not in self._separators
-                assert len(self._separatorMap[bc_k]) == 0
-                self._separatorMap = self._separatorMap.copy()
                 del self._separatorMap[bc_k]
         else:
-            assert self._c_k_reduced
-            assert v not in self._separators
-            assert len(bc_kset) == 1
-            bc_k = next(iter(bc_kset))
-            biconReduce.append((bc_k, self._biconComponents[bc_k].copy()))
+            #assert self._c_k_reduced
+            #assert v not in self._separators
+            #assert len(bc_kset) == 1
+            bc_kset_reduced = bc_kset
 
-        if biconReduce:
+        if bc_kset_reduced:
             self._separators = self._separators.copy()
             self._separators.discard(v)
-            self._separatorMap = self._separatorMap.copy()
-            while biconReduce:
-                bc_k, bc_reduced = biconReduce.pop()
+            while bc_kset_reduced:
+                bc_k = bc_kset_reduced.pop()
+                bc_reduced = self._biconComponents[bc_k].copy()
                 bc_reduced.remove(v)
 
                 if len(bc_reduced) == 1:
@@ -415,7 +412,7 @@ class OnlineReducedGraph(object):
                     if len(bc_kset_other) > 1:
                         # what's left of bc_reduced is a subset of
                         # another biconnected component
-                        bc_kset_other = self._biconComponentMap[other].copy()
+                        bc_kset_other = bc_kset_other.copy()
                         bc_kset_other.remove(bc_k)
                         self._biconComponentMap[other] = bc_kset_other
                         del self._biconComponents[bc_k]
@@ -441,7 +438,7 @@ class OnlineReducedGraph(object):
                         self._separatorMap[newbc_k] = newbc & (oldseps | seps)
                         for bcv in newbc:
                             self._biconComponentMap[bcv].add(newbc_k)
-                    self._separators = self._separators | seps
+                    self._separators |= seps
                 else:
                     self._biconComponents[bc_k] = bc_reduced
                     seps = self._separatorMap[bc_k]
