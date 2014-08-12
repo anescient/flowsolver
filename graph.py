@@ -407,7 +407,6 @@ class OnlineReducedGraph(object):
                     self._biconComponents[bc_k] = bc_reduced
                     seps = self._separatorMap[bc_k]
                     if v in seps:
-                        assert len(bc_reduced) == 1
                         seps = seps.copy()
                         seps.remove(v)
                         self._separatorMap[bc_k] = seps
@@ -429,6 +428,7 @@ class OnlineReducedGraph(object):
         assert self._vertices == set(self._biconComponentMap)
         componentSum = set()
         for k, c in self._components.iteritems():
+            assert c
             for v in c:
                 assert self._componentMap[v] == k
             assert not c & componentSum
@@ -450,6 +450,7 @@ class OnlineReducedGraph(object):
         assert seps == self._separators
         assert len(bcs) == len(self._biconComponents)
         for k, bc in self._biconComponents.iteritems():
+            assert bc
             bcs, seps = self._graph.biconnectedComponents(bc)
             assert len(bcs) == 1 and not seps
             for v, kset in self._biconComponentMap.iteritems():
@@ -623,7 +624,22 @@ def _testGraphBiconnected():
         26: set([25, 27]), 27: set([26, 20, 34]), 28: set([21]), \
         30: set([31, 23]), 31: set([24, 32, 38, 30]), 32: set([25, 31]), \
         34: set([27]), 38: set([45, 31]), 44: set([45]), \
-        45: set([44, 46, 38]), 46: set([45])}]
+        45: set([44, 46, 38]), 46: set([45])},
+
+        {20: set([31]), 24: set([35]), 31: set([42, 20]), 34: set([35, 45]), \
+        35: set([24, 34, 46]), 39: set([40]), 40: set([41, 51, 39]), \
+        41: set([40, 42, 52]), 42: set([41, 53, 31]), 44: set([45, 55]), \
+        45: set([56, 34, 44, 46]), 46: set([57, 35, 45]), \
+        51: set([40, 52, 62]), 52: set([41, 51, 53, 63]), \
+        53: set([64, 42, 52]), 55: set([56, 66, 44]), \
+        56: set([57, 67, 45, 55]), 57: set([56, 68, 46]), \
+        62: set([73, 51, 63]), 63: set([64, 74, 52, 62]), 64: set([53, 63]), \
+        66: set([67, 55]), 67: set([56, 66, 68, 78]), \
+        68: set([57, 67, 69, 79]), 69: set([80, 68]), 72: set([73, 83]), \
+        73: set([72, 74, 62]), 74: set([73, 63]), 78: set([67, 79]), \
+        79: set([80, 90, 68, 78]), 80: set([81, 91, 69, 79]), \
+        81: set([80, 82, 92]), 82: set([81, 83]), 83: set([72, 82]), \
+        90: set([91, 79]), 91: set([80, 90, 92]), 92: set([81, 91])}]
     for es in edgesets:
         es = deepcopy(es)
         g = SimpleGraph(es)
