@@ -177,12 +177,14 @@ class FlowGraphSolver(object):
                     return True
 
             # check if any biconnected component cannot be covered
-            for c in self._reducedgraph.leafComponents():
-                for v1, v2 in self._headpairs:
-                    # TODO skip if leaf not in commoncomponents
-                    if self._graph.adjacencies(v1, c):
+            for k, vset in self._reducedgraph.leafComponents():
+                for common, (v1, v2) in izip(self._commoncomponents, \
+                                             self._headpairs):
+                    if k not in common:
+                        continue
+                    if self._graph.adjacencies(v1, vset):
                         break
-                    if self._graph.adjacencies(v2, c):
+                    if self._graph.adjacencies(v2, vset):
                         break
                 else:
                     return True

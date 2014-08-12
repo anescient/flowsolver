@@ -341,7 +341,8 @@ class OnlineReducedGraph(object):
         for bc_k, bc in self._biconComponents.iteritems():
             seps = self._separatorMap[bc_k]
             if len(seps) == 1:
-                yield bc - seps
+                c_k = self._findComponent(next(iter(bc)))
+                yield (c_k, bc - seps)
 
     def maskVertex(self, v):
         self._vertices = self._vertices.copy()
