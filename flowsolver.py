@@ -149,7 +149,7 @@ class FlowGraphSolver(object):
                                     common.add(k)
                         self._commoncomponents[i] = common
 
-        def heuristicUnsolvable(self):
+        def simpleUnsolvable(self):
             # check that all pairs can be connected and
             # all open vertices can be reached by some pair
             covered = set()
@@ -176,6 +176,12 @@ class FlowGraphSolver(object):
                 if x == 1:
                     return True
 
+            return False
+
+        def biconnectedUnsolvable(self):
+            if not self._reducedgraph.separatorsChanged:
+                return False  # assume parent frames have been checked
+
             # check if any biconnected component cannot be covered
             for k, vset in self._reducedgraph.leafComponents():
                 for common, (v1, v2) in izip(self._commoncomponents, \
@@ -189,7 +195,33 @@ class FlowGraphSolver(object):
                 else:
                     return True
 
-            # TODO check if any vertex must be used by more than one pair
+            # check if any cut vertex must be used by more than one pair
+            checkpairs = {}  # component: list of (v1, v2)
+            for common, hp in izip(self._commoncomponents, \
+                                   self._headpairs):
+                if len(common) == 1 and not self._graph.adjacent(*hp):
+                    k = next(iter(common))
+                    if k not in checkpairs:
+                        checkpairs[k] = []
+                    checkpairs[k].append(hp)
+            if any(len(pairs) > 1 for pairs in checkpairs.values()):
+                bf, bfmap, bfseps = self._reducedgraph.blockForest()
+                for c_k, pairs in checkpairs.iteritems():
+                    if len(pairs) < 2:
+                        continue
+                    bfseps_used = set()
+                    for v1, v2 in pairs:
+                        v1_in = set(map(bfmap.get, \
+                            self._reducedgraph.componentAdjacencies(v1, c_k)))
+                        v2_in = set(map(bfmap.get, \
+                            self._reducedgraph.componentAdjacencies(v2, c_k)))
+                        p = bfseps.copy()
+                        for a in v1_in:
+                            for b in v2_in:
+                                p &= set(bf.shortestPath(a, b))
+                        if p & bfseps_used:
+                            return True
+                        bfseps_used |= p
 
             return False
 
@@ -340,7 +372,7 @@ class FlowGraphSolver(object):
 
     def __init__(self, graph, endpointpairs):
         self._stack = [self._Frame.initial(graph, endpointpairs)]
-        if self._stack[-1].heuristicUnsolvable():
+        if self._stack[-1].simpleUnsolvable():
             self._stack = []
         self._totalframes = 1
         self._memo = self._Memo()
@@ -360,7 +392,11 @@ class FlowGraphSolver(object):
             top = self._stack[-1].takeNextFrame()
             self._stack.append(top)
             self._totalframes += 1
-            if top.heuristicUnsolvable() or self._memo.find(top):
+            if top.simpleUnsolvable() or self._memo.find(top):
+                top.abort()
+                return False
+            if top.biconnectedUnsolvable():
+                self._memo.insert(top)
                 top.abort()
                 return False
             return True

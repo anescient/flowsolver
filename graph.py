@@ -294,6 +294,7 @@ class OnlineReducedGraph(object):
         self._c_k_deleted = None
         self._c_k_reduced = None
         self._c_kset_new = None
+        self._separatorsChanged = False
 
     def copy(self):
         return OnlineReducedGraph(self._graph, (\
@@ -316,6 +317,10 @@ class OnlineReducedGraph(object):
     @property
     def newSubComponents(self):
         return self._c_kset_new
+
+    @property
+    def separatorsChanged(self):
+        return self._separatorsChanged
 
     @property
     def allMasked(self):
@@ -343,6 +348,27 @@ class OnlineReducedGraph(object):
             if len(seps) == 1:
                 c_k = self._findComponent(next(iter(bc)))
                 yield (c_k, bc - seps)
+
+    def blockForest(self):
+        bf = SimpleGraph()
+        vertexmap = {}  # vertex: vertex in block forest
+        articulations = set()  # separators mapped to block forest
+        for sv in self._separators:
+            av = bf.pushVertex()
+            articulations.add(av)
+            vertexmap[sv] = av
+        for bc_k, bc in self._biconComponents.iteritems():
+            seps = self._separatorMap[bc_k]
+            if len(bc) == 2 and len(seps) == 2:
+                it = iter(bc)
+                bf.addEdge(vertexmap[next(it)], vertexmap[next(it)])
+            else:
+                bcv = bf.pushVertex()
+                for v in bc - seps:
+                    vertexmap[v] = bcv
+                for sv in seps:
+                    bf.addEdge(bcv, vertexmap[sv])
+        return (bf, vertexmap, articulations)
 
     def maskVertex(self, v):
         self._vertices = self._vertices.copy()
@@ -399,8 +425,8 @@ class OnlineReducedGraph(object):
             bc_kset_reduced = bc_kset
 
         if bc_kset_reduced:
-            self._separators = self._separators.copy()
-            self._separators.discard(v)
+            separators = self._separators.copy()
+            separators.discard(v)
             while bc_kset_reduced:
                 bc_k = bc_kset_reduced.pop()
                 bc_reduced = self._biconComponents[bc_k].copy()
@@ -418,7 +444,7 @@ class OnlineReducedGraph(object):
                         del self._biconComponents[bc_k]
                         del self._separatorMap[bc_k]
                         if len(bc_kset_other) == 1:
-                            self._separators.remove(other)
+                            separators.remove(other)
                             bc_k_other = next(iter(bc_kset_other))
                             m = self._separatorMap[bc_k_other].copy()
                             m.remove(other)
@@ -438,7 +464,7 @@ class OnlineReducedGraph(object):
                         self._separatorMap[newbc_k] = newbc & (oldseps | seps)
                         for bcv in newbc:
                             self._biconComponentMap[bcv].add(newbc_k)
-                    self._separators |= seps
+                    separators |= seps
                 else:
                     self._biconComponents[bc_k] = bc_reduced
                     seps = self._separatorMap[bc_k]
@@ -447,8 +473,15 @@ class OnlineReducedGraph(object):
                         seps.remove(v)
                         self._separatorMap[bc_k] = seps
 
+            if separators != self._separators:
+                self._separators = separators
+                self._separatorsChanged = True
+
     def adjacencies(self, v):
         return self._graph.adjacencies(v, self._vertices)
+
+    def componentAdjacencies(self, v, k):
+        return self._graph.adjacencies(v, self._components[k])
 
     def componentsAdjacencies(self, v, kset):
         mask = reduce(set.union, map(self._components.get, kset))
