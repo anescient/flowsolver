@@ -376,6 +376,7 @@ class FlowGraphSolver(object):
             self._stack = []
         self._totalframes = 1
         self._memo = self._Memo()
+        self._solutions = set()
 
     @property
     def done(self):
@@ -420,7 +421,13 @@ class FlowGraphSolver(object):
             while self.step():
                 step = True
             if self._stack[-1].isSolved():
-                return True
+                solution = self._immutableFlows()
+                if solution in self._solutions:
+                    self._memo = self._Memo()
+                    self._stack.pop()
+                else:
+                    self._solutions.add(solution)
+                    return True
             if step and limit is not None:
                 limit -= 1
                 if limit <= 0:
@@ -438,15 +445,18 @@ class FlowGraphSolver(object):
         print "{0} visited".format(self._totalframes)
         print "memo: " + self._memo.stats()
         if self.solved:
-            flows = []
-            for f in self.__getFlows():
-                if f[0] > f[-1]:
-                    f.reverse()
-                flows.append(tuple(f))
-            print "solution", hex(abs(hash(frozenset(flows))))
+            print "solution", hex(abs(hash(self._immutableFlows())))
 
     def getFlows(self):
         return self._Frame.recoverPaths(self._stack)
+
+    def _immutableFlows(self):
+        flows = []
+        for flow in self.__getFlows():
+            if flow[-1] < flow[0]:
+                flow.reverse()
+            flows.append(tuple(flow))
+        return frozenset(flows)
 
     __getFlows = getFlows
 
