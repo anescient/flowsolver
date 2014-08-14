@@ -109,6 +109,7 @@ class FlowBoardEditor(QWidget):
             tool = self.selectedTool
             if tool.continuous and tool.canApply(self._board, cell):
                 tool.applyAction(self._board, cell)
+                self.boardChanged.emit(self.boardIsValid)
 
     def _takeToolFromCell(self, cell):
         if self._board.hasBridgeAt(cell):
