@@ -429,6 +429,11 @@ class FlowGraphSolver(object):
                 pass
         return True
 
+    def skipSolution(self):
+        assert self.solved
+        self._memo = self._Memo()
+        self._stack.pop()
+
     def printStats(self):
         print "{0} visited".format(self._totalframes)
         print "memo: " + self._memo.stats()
