@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from collections import deque
-from itertools import islice, chain, izip
+from itertools import islice, chain, izip, product
 from flowboard import FlowBoardGraph
 from graph import OnlineReducedGraph
 
@@ -10,8 +10,7 @@ class FlowGraphSolver(object):
 
     class _Frame(object):
 
-        def __init__(self, graph, reducedgraph, \
-                     headpairs, commoncomponents):
+        def __init__(self, graph, reducedgraph, headpairs, commoncomponents):
             self._graph = graph
             self._reducedgraph = reducedgraph
             self._headpairs = headpairs
@@ -56,9 +55,8 @@ class FlowGraphSolver(object):
             return self._reducedgraph.allMasked and not self._headpairs
 
         def copy(self, move=None):
-            frame = self.__class__(\
-                self._graph, self._reducedgraph, \
-                self._headpairs, self._commoncomponents)
+            frame = self.__class__(self._graph, self._reducedgraph, \
+                                   self._headpairs, self._commoncomponents)
             if move:
                 frame.applyMove(*move)
             return frame
@@ -197,8 +195,7 @@ class FlowGraphSolver(object):
 
             # check if any cut vertex must be used by more than one pair
             checkpairs = {}  # component: list of (v1, v2)
-            for common, hp in izip(self._commoncomponents, \
-                                   self._headpairs):
+            for common, hp in izip(self._commoncomponents, self._headpairs):
                 if len(common) == 1 and not self._graph.adjacent(*hp):
                     k = next(iter(common))
                     if k not in checkpairs:
@@ -216,9 +213,8 @@ class FlowGraphSolver(object):
                         v2_in = set(map(bfmap.get, \
                             self._reducedgraph.componentAdjacencies(v2, c_k)))
                         p = bfseps.copy()
-                        for a in v1_in:
-                            for b in v2_in:
-                                p &= set(bf.shortestPath(a, b))
+                        for a, b in product(v1_in, v2_in):
+                            p &= set(bf.shortestPath(a, b))
                         if p & bfseps_used:
                             return True
                         bfseps_used |= p
@@ -311,11 +307,9 @@ class FlowGraphSolver(object):
                 reducedgraph.maskVertex(v)
             commoncomponents = []
             for v1, v2 in headpairs:
-                common = reducedgraph.adjacentComponents(v1)
-                common &= reducedgraph.adjacentComponents(v2)
-                commoncomponents.append(common)
-            return cls(graph, reducedgraph, \
-                       headpairs, commoncomponents)
+                commoncomponents.append(reducedgraph.adjacentComponents(v1) & \
+                                        reducedgraph.adjacentComponents(v2))
+            return cls(graph, reducedgraph, headpairs, commoncomponents)
 
         @staticmethod
         def recoverPaths(framestack):
@@ -323,9 +317,10 @@ class FlowGraphSolver(object):
                 return []
             pathpairs = [([v1], [v2]) for v1, v2 in framestack[0].headPairs]
             for frame in framestack[1:]:
-                for path in (p for pp in pathpairs for p in pp):
+                for path in chain(*pathpairs):
                     if path[-1] == frame.moveApplied[0]:
                         path.append(frame.moveApplied[1])
+                        break
             paths = []
             for p1, p2 in pathpairs:
                 if p1[-1] == p2[-1]:
