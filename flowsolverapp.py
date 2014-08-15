@@ -64,7 +64,7 @@ class FlowSolverAppWindow(QMainWindow):
     @pyqtSlot(bool)
     def _solveClicked(self, _):
         self._solvepopup.show()
-        self._solvepopup.runSolve(self._editor.getBoard())
+        self._solvepopup.startSolve(self._editor.getBoard())
 
     @pyqtSlot(bool)
     def _openClicked(self, _):
@@ -98,6 +98,11 @@ class FlowSolvingPopup(QDialog):
         status = QStatusBar()
         status.setSizeGripEnabled(False)
 
+        self._againButton = QPushButton("next")
+        self._againButton.setVisible(False)
+        self._againButton.clicked.connect(self._againClicked)
+        status.addPermanentWidget(self._againButton)
+
         self._abortButton = QPushButton("close")
         self._abortButton.clicked.connect(self._abortClicked)
         status.addPermanentWidget(self._abortButton)
@@ -112,21 +117,27 @@ class FlowSolvingPopup(QDialog):
         self._timer = QTimer()
         self._timer.timeout.connect(self._timerTick)
 
-    def runSolve(self, board):
+    def startSolve(self, board):
+        self._againButton.setVisible(False)
         if board.isValid():
             self._solverWidget.setBoard(board)
-            self._setMessage("running")
-            self._abortButton.setText("cancel")
-            self._timer.start(100)
-            self._solverWidget.run()
+            self._runSolve()
         else:
             self._solverWidget.setBoard(None)
             self._setMessage("board is not valid")
+            self._abortButton.setText("close")
 
     def closeEvent(self, event):
         self._timer.stop()
         self._solverWidget.stop()
         super(FlowSolvingPopup, self).closeEvent(event)
+
+    def _runSolve(self, again=False):
+        self._setMessage("running")
+        self._againButton.setVisible(False)
+        self._abortButton.setText("cancel")
+        self._timer.start(100)
+        self._solverWidget.run(skipSolution=again)
 
     def _setMessage(self, msg):
         self._messageLabel.setText(msg)
@@ -144,7 +155,9 @@ class FlowSolvingPopup(QDialog):
     def _solverFinished(self):
         self._timer.stop()
         msg = "finished after " + self._getTimerStr()
-        if not self._solverWidget.solved:
+        if self._solverWidget.solved:
+            self._againButton.setVisible(True)
+        else:
             msg += ", no solution found"
         self._setMessage(msg)
         self._abortButton.setText("close")
@@ -152,6 +165,10 @@ class FlowSolvingPopup(QDialog):
     @pyqtSlot(bool)
     def _abortClicked(self, _):
         self.close()
+
+    @pyqtSlot(bool)
+    def _againClicked(self, _):
+        self._runSolve(again=True)
 
     @pyqtSlot()
     def _timerTick(self):

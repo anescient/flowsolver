@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from collections import deque
+from itertools import izip, combinations, count
 
 
 class QueryableSimpleGraph(object):
@@ -36,37 +37,48 @@ class QueryableSimpleGraph(object):
         else:
             return self._edges[v].intersection(mask)
 
+    def sortClosest(self, vertices, target, mask=None):
+        """
+            Return 'vertices' ordered by increasing distance from 'target'.
+            Unreachable vertices omitted.
+            mask: use only these vertices and their incident edges
+        """
+        toVisit = self._maskVertices(mask)
+        vertices = set(vertices)
+        ordered = []
+        if target in vertices:
+            ordered.append(target)
+            vertices.remove(target)
+        bfs = deque([target])
+        while vertices and bfs:
+            v = bfs.popleft()
+            ext = self.adjacencies(v, toVisit)
+            toVisit -= ext
+            for ev in ext:
+                if ev in vertices:
+                    ordered.append(ev)
+                    vertices.remove(ev)
+                bfs.append(ev)
+        return ordered
+
     def connected(self, v1, v2, mask=None):
         """
             Return True iff there is some path from v1 to v2.
             mask: use only these vertices and their incident edges
         """
         assert v1 != v2
-        if v2 in self._edges[v1]:
+        if self.adjacent(v1, v2):
             return True
         toVisit = self._maskVertices(mask)
-        toVisit.discard(v1)
-        toVisit.discard(v2)
-        front1 = self.adjacencies(v1, toVisit)
-        front2 = self.adjacencies(v2, toVisit)
-        if not front1 or not front2:
-            return False
-        flip = False
-        while not front1.intersection(front2):
-            if flip:
-                toVisit -= front1
-                front1 = reduce(set.union, \
-                    (self.adjacencies(fv, toVisit) for fv in front1))
-                if not front1:
-                    return False
-            else:
-                toVisit -= front2
-                front2 = reduce(set.union, \
-                    (self.adjacencies(fv, toVisit) for fv in front2))
-                if not front2:
-                    return False
-            flip = not flip
-        return True
+        front1, front2 = set([v1]), set([v2])
+        while front1:
+            toVisit -= front1
+            front1 = reduce(set.union, \
+                (self.adjacencies(v, toVisit) for v in front1))
+            if front1.intersection(front2):
+                return True
+            front1, front2 = front2, front1
+        return False
 
     def shortestPath(self, v1, v2, mask=None):
         """
@@ -87,7 +99,6 @@ class QueryableSimpleGraph(object):
         leafs_a, leafs_b = set([v1]), set([v2])
         join = None
         while mask_a and join is None:
-            ext = None
             leafs = set()
             while leafs_a:
                 v = leafs_a.pop()
@@ -102,15 +113,13 @@ class QueryableSimpleGraph(object):
                 else:
                     continue
                 break
-            leafs_a = leafs
-            if ext is None:
+            if not leafs:
                 break
+            leafs_a, leafs_b = leafs_b, leafs
             mask_a, mask_b = mask_b, mask_a
-            leafs_a, leafs_b = leafs_b, leafs_a
         if join is None:
             return None
-        path1 = [join[0]]
-        path2 = [join[1]]
+        path1, path2 = [join[0]], [join[1]]
         for path in (path1, path2):
             while trees[path[-1]] is not None:
                 path.append(trees[path[-1]])
@@ -293,6 +302,297 @@ class SimpleGraph(QueryableSimpleGraph):
         self._edges[v2].remove(v1)
 
 
+class OnlineReducedGraph(object):
+    def __init__(self, graph, state=None):
+        self._graph = graph
+        if state is None:
+            self._initializeState()
+        else:
+            self._keys, \
+            self._vertices, \
+            self._components, \
+            self._biconComponents, \
+            self._separators, \
+            self._biconComponentMap, \
+            self._separatorMap = state
+        self._c_k_deleted = None
+        self._c_k_reduced = None
+        self._c_kset_new = None
+        self._separatorsChanged = False
+
+    def copy(self):
+        return OnlineReducedGraph(self._graph, (\
+            self._keys, \
+            self._vertices, \
+            self._components, \
+            self._biconComponents, \
+            self._separators, \
+            self._biconComponentMap, \
+            self._separatorMap))
+
+    @property
+    def componentDeleted(self):
+        return self._c_k_deleted
+
+    @property
+    def componentReduced(self):
+        return self._c_k_reduced
+
+    @property
+    def newSubComponents(self):
+        return self._c_kset_new
+
+    @property
+    def separatorsChanged(self):
+        return self._separatorsChanged
+
+    @property
+    def allMasked(self):
+        return not self._vertices
+
+    @property
+    def disjoint(self):
+        return len(self._components) > 1
+
+    @property
+    def vertices(self):
+        return self._vertices
+
+    @property
+    def components(self):
+        return self._components
+
+    def leafComponents(self):
+        """
+            Return sets of vertices from biconnected components having
+            only one separator, minus the separator.
+        """
+        for bc_k, bc in self._biconComponents.iteritems():
+            seps = self._separatorMap[bc_k]
+            if len(seps) == 1:
+                c_k = self._findComponent(next(iter(bc)))
+                yield (c_k, bc - seps)
+
+    def blockForest(self):
+        bf = SimpleGraph()
+        vertexmap = {}  # vertex: vertex in block forest
+        articulations = set()  # separators mapped to block forest
+        for sv in self._separators:
+            av = bf.pushVertex()
+            articulations.add(av)
+            vertexmap[sv] = av
+        for bc_k, bc in self._biconComponents.iteritems():
+            seps = self._separatorMap[bc_k]
+            if len(bc) == 2 and len(seps) == 2:
+                it = iter(bc)
+                bf.addEdge(vertexmap[next(it)], vertexmap[next(it)])
+            else:
+                bcv = bf.pushVertex()
+                for v in bc - seps:
+                    vertexmap[v] = bcv
+                for sv in seps:
+                    bf.addEdge(bcv, vertexmap[sv])
+        return (bf, vertexmap, articulations)
+
+    def maskVertex(self, v):
+        self._vertices = self._vertices.copy()
+        self._vertices.remove(v)
+        # self._vertices valid
+
+        self._components = self._components.copy()
+        c_k = self._findComponent(v)
+        self._c_k_deleted = None
+        self._c_k_reduced = None
+        self._c_kset_new = None
+        c = self._components[c_k]
+        if len(c) == 1:
+            self._c_k_deleted = c_k
+            del self._components[c_k]
+        else:
+            c = c.copy()
+            c.remove(v)
+            if v in self._separators:
+                self._c_k_deleted = c_k
+                del self._components[c_k]
+                self._c_kset_new = set()
+                for c_new in self._graph.disjointPartitions(c):
+                    c_k_new = next(self._keys)
+                    self._components[c_k_new] = c_new
+                    self._c_kset_new.add(c_k_new)
+                #assert len(self._c_kset_new) > 1
+            else:
+                self._c_k_reduced = c_k
+                self._components[c_k] = c
+        # self._components valid
+
+        self._biconComponents = self._biconComponents.copy()
+        self._separatorMap = self._separatorMap.copy()
+        self._biconComponentMap = self._biconComponentMap.copy()
+        bc_kset = self._biconComponentMap.pop(v).copy()
+        bc_kset_reduced = None
+        if self._c_k_deleted:
+            if self._c_kset_new:
+                #assert len(bc_kset) > 1
+                bc_kset_reduced = bc_kset
+            else:
+                #assert len(bc_kset) == 1
+                #assert len(self._biconComponents[bc_k]) == 1
+                #assert v not in self._separators
+                #assert len(self._separatorMap[bc_k]) == 0
+                bc_k = bc_kset.pop()
+                del self._biconComponents[bc_k]
+                del self._separatorMap[bc_k]
+        else:
+            #assert self._c_k_reduced
+            #assert v not in self._separators
+            #assert len(bc_kset) == 1
+            bc_kset_reduced = bc_kset
+
+        if bc_kset_reduced:
+            separators = self._separators.copy()
+            separators.discard(v)
+            while bc_kset_reduced:
+                bc_k = bc_kset_reduced.pop()
+                bc_reduced = self._biconComponents[bc_k].copy()
+                bc_reduced.remove(v)
+
+                if len(bc_reduced) == 1:
+                    other = next(iter(bc_reduced))
+                    bc_kset_other = self._biconComponentMap[other]
+                    if len(bc_kset_other) > 1:
+                        # what's left of bc_reduced is a subset of
+                        # another biconnected component
+                        bc_kset_other = bc_kset_other.copy()
+                        bc_kset_other.remove(bc_k)
+                        self._biconComponentMap[other] = bc_kset_other
+                        del self._biconComponents[bc_k]
+                        del self._separatorMap[bc_k]
+                        if len(bc_kset_other) == 1:
+                            separators.remove(other)
+                            bc_k_other = next(iter(bc_kset_other))
+                            m = self._separatorMap[bc_k_other].copy()
+                            m.remove(other)
+                            self._separatorMap[bc_k_other] = m
+                        continue
+
+                bcs, seps = self._graph.biconnectedComponents(bc_reduced)
+                if seps:
+                    del self._biconComponents[bc_k]
+                    for bcv in bc_reduced:
+                        ks = self._biconComponentMap[bcv].copy()
+                        ks.remove(bc_k)
+                        self._biconComponentMap[bcv] = ks
+                    oldseps = self._separatorMap.pop(bc_k)
+                    for newbc_k, newbc in izip(self._keys, bcs):
+                        self._biconComponents[newbc_k] = newbc
+                        self._separatorMap[newbc_k] = newbc & (oldseps | seps)
+                        for bcv in newbc:
+                            self._biconComponentMap[bcv].add(newbc_k)
+                    separators |= seps
+                else:
+                    self._biconComponents[bc_k] = bc_reduced
+                    seps = self._separatorMap[bc_k]
+                    if v in seps:
+                        seps = seps.copy()
+                        seps.remove(v)
+                        self._separatorMap[bc_k] = seps
+
+            if separators != self._separators:
+                self._separators = separators
+                self._separatorsChanged = True
+
+    def adjacencies(self, v):
+        return self._graph.adjacencies(v, self._vertices)
+
+    def componentAdjacencies(self, v, k):
+        return self._graph.adjacencies(v, self._components[k])
+
+    def componentsAdjacencies(self, v, kset):
+        mask = reduce(set.union, map(self._components.get, kset))
+        return self._graph.adjacencies(v, mask)
+
+    def sortClosest(self, vertices, target):
+        return self._graph.sortClosest(vertices, target, self._vertices)
+
+    def isSeparator(self, v):
+        return v in self._separators
+
+    def biconnectedComponents(self):
+        return (self._biconComponents.values(), self._separators)
+
+    def connectedComponent(self, v):
+        return self._components[self._findComponent(v)]
+
+    def disjointPartitions(self):
+        return self._components.values()
+
+    def adjacentComponents(self, v):
+        adj = self._graph.adjacencies(v, self._vertices)
+        return set(c_k for c_k, c in self._components.iteritems() if adj & c)
+
+    def assertIntegrity(self):
+        assert self._vertices == set(self._biconComponentMap)
+        componentSum = set()
+        for k, c in self._components.iteritems():
+            assert c
+            assert not c & componentSum
+            componentSum |= c
+        assert self._vertices == componentSum
+        for v, kset in self._biconComponentMap.iteritems():
+            assert kset
+            assert (len(kset) > 1) == (v in self._separators)
+            for k in kset:
+                assert v in self._biconComponents[k]
+        assert set(self._separatorMap) == set(self._biconComponents)
+        for k, vset in self._separatorMap.iteritems():
+            assert vset == self._separators & self._biconComponents[k]
+        for bc1, bc2 in combinations(self._biconComponents.values(), 2):
+            assert len(bc1 & bc2) < 2
+            assert not bc1.issubset(bc2)
+            assert not bc2.issubset(bc1)
+        bcs, seps = self._graph.biconnectedComponents(self._vertices)
+        assert seps == self._separators
+        assert len(bcs) == len(self._biconComponents)
+        for k, bc in self._biconComponents.iteritems():
+            assert bc
+            bcs, seps = self._graph.biconnectedComponents(bc)
+            assert len(bcs) == 1 and not seps
+            for v, kset in self._biconComponentMap.iteritems():
+                assert (k in kset) == (v in bc)
+
+    def _findComponent(self, v):
+        for c_k, c in self._components.iteritems():
+            if v in c:
+                return c_k
+        raise KeyError()
+
+    def _initializeState(self):
+        # self._vertices           set of unmasked vertices
+        # self._components         key: set of vertices
+        # self._biconComponents    key: set of vertices
+        # self._separators         set of vertices
+        # self._biconComponentMap  v: set of bicon component keys
+        # self._separatorMap       bicon component key: set of separators
+
+        self._keys = count(1)
+
+        self._vertices = set(self._graph.vertices)
+        self._components = \
+            dict(izip(self._keys, self._graph.disjointPartitions()))
+
+        bcs, seps = self._graph.biconnectedComponents()
+        self._biconComponents = dict(izip(self._keys, bcs))
+        self._separators = seps
+
+        self._biconComponentMap = dict((v, set()) for v in self._vertices)
+        self._separatorMap = dict((k, set()) for k in self._biconComponents)
+        for k, bc in self._biconComponents.iteritems():
+            for v in bc:
+                self._biconComponentMap[v].add(k)
+                if v in self._separators:
+                    self._separatorMap[k].add(v)
+
+
 def _testGraph():
     g = SimpleGraph()
     assert isinstance(g, QueryableSimpleGraph)
@@ -318,9 +618,11 @@ def _testGraph():
         g.addEdge(verts[i], verts[i + 1])
         for v in verts[i + 2:]:
             assert not g.connected(verts[i + 1], v)
+            assert not g.connected(v, verts[i + 1])
         for j in xrange(i + 1):
             if j > 0:
                 assert g.connected(verts[0], verts[j])
+                assert g.connected(verts[j], verts[0])
             assert g.connectedComponent(verts[j]) == set(verts[:i + 2])
     for v in verts:
         assert g.connectedComponent(v) == set(verts)
@@ -387,9 +689,20 @@ def _testGraph():
     assert g.isConnectedSet(set(verts[:1] + verts[-1:]))
 
 
+def _equalSetSets(sets_a, sets_b):
+    sets_a = set(frozenset(s) for s in sets_a)
+    sets_b = set(frozenset(s) for s in sets_b)
+    if sets_a != sets_b:
+        print len(sets_a), "!=", len(sets_b)
+    return sets_a == sets_b
+
+
 def _testGraphBiconnected():
-    edgesets = [{\
-        0: set([]), 2: set([3, 13]), 3: set([2, 4, 14]), 4: set([3, 15]), \
+    import random
+    from copy import deepcopy
+    random.seed('consistent seed')
+    edgesets = 3 * [\
+        {0: set([]), 2: set([3, 13]), 3: set([2, 4, 14]), 4: set([3, 15]), \
         13: set([2, 14]), 14: set([25, 3, 13, 15]), 15: set([4, 14]), \
         17: set([18, 28]), 18: set([17, 29]), 22: set([23]), \
         23: set([34, 22]), 25: set([36, 14]), 28: set([17, 29, 39]), \
@@ -417,13 +730,46 @@ def _testGraphBiconnected():
         26: set([25, 27]), 27: set([26, 20, 34]), 28: set([21]), \
         30: set([31, 23]), 31: set([24, 32, 38, 30]), 32: set([25, 31]), \
         34: set([27]), 38: set([45, 31]), 44: set([45]), \
-        45: set([44, 46, 38]), 46: set([45])}]
+        45: set([44, 46, 38]), 46: set([45])},
+
+        {20: set([31]), 24: set([35]), 31: set([42, 20]), 34: set([35, 45]), \
+        35: set([24, 34, 46]), 39: set([40]), 40: set([41, 51, 39]), \
+        41: set([40, 42, 52]), 42: set([41, 53, 31]), 44: set([45, 55]), \
+        45: set([56, 34, 44, 46]), 46: set([57, 35, 45]), \
+        51: set([40, 52, 62]), 52: set([41, 51, 53, 63]), \
+        53: set([64, 42, 52]), 55: set([56, 66, 44]), \
+        56: set([57, 67, 45, 55]), 57: set([56, 68, 46]), \
+        62: set([73, 51, 63]), 63: set([64, 74, 52, 62]), 64: set([53, 63]), \
+        66: set([67, 55]), 67: set([56, 66, 68, 78]), \
+        68: set([57, 67, 69, 79]), 69: set([80, 68]), 72: set([73, 83]), \
+        73: set([72, 74, 62]), 74: set([73, 63]), 78: set([67, 79]), \
+        79: set([80, 90, 68, 78]), 80: set([81, 91, 69, 79]), \
+        81: set([80, 82, 92]), 82: set([81, 83]), 83: set([72, 82]), \
+        90: set([91, 79]), 91: set([80, 90, 92]), 92: set([81, 91])}]
     for es in edgesets:
+        es = deepcopy(es)
         g = SimpleGraph(es)
         verts = set(g.vertices)
-        while verts:
+        vertlist = list(verts)
+        random.shuffle(vertlist)
+        rgstack = [OnlineReducedGraph(QueryableSimpleGraph(deepcopy(es)))]
+        for v in vertlist:
+            rgstack.append(rgstack[-1].copy())
+            rgstack[-1].maskVertex(v)
+        while vertlist:
             assert set(es) == verts
             bcs, seps = g.biconnectedComponents()
+            for bc1, bc2 in combinations(bcs, 2):
+                assert len(bc1 & bc2) < 2
+                assert not bc1.issubset(bc2)
+                assert not bc2.issubset(bc1)
+
+            rg = rgstack.pop(0)
+            rg.assertIntegrity()
+            rg_bcs, rg_seps = rg.biconnectedComponents()
+            assert _equalSetSets(bcs, rg_bcs)
+            assert seps == rg_seps
+
             assert reduce(set.union, bcs) == verts
             innerbcs = [bc - seps for bc in bcs]
             assert sum(map(len, innerbcs)) + len(seps) == len(verts)
@@ -432,17 +778,21 @@ def _testGraphBiconnected():
                 for v in bc:
                     memberbcs[v].add(i)
             parts = g.disjointPartitions()
+            assert _equalSetSets(parts, rg.disjointPartitions())
+            for part in parts:
+                for v in part:
+                    assert rg.connectedComponent(v) == part
             for v in verts:
                 novparts = g.disjointPartitions(verts - set([v]))
                 if g.isSeparator(v):
+                    assert rg.isSeparator(v)
                     assert v in seps
                     assert len(memberbcs[v]) > 1
-                    assert g.isSeparator(v)
                     assert len(novparts) == len(parts) + len(memberbcs[v]) - 1
                 else:
+                    assert not rg.isSeparator(v)
                     assert v not in seps
                     assert len(memberbcs[v]) == 1
-                    assert not g.isSeparator(v)
                     if len(g.connectedComponent(v)) == 1:
                         assert len(novparts) == len(parts) - 1
                     else:
@@ -455,7 +805,9 @@ def _testGraphBiconnected():
                 for v in bc:
                     assert bc.issubset(g.connectedComponent(v))
                     assert bc == g.connectedComponent(v, bc)
-            g.removeVertex(verts.pop())
+            v = vertlist.pop(0)
+            verts.remove(v)
+            g.removeVertex(v)
 
 
 if __name__ == '__main__':

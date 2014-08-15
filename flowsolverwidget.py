@@ -47,15 +47,20 @@ class FlowSolverWidget(QWidget):
                 self._board.size, self._board.size, self.rect().size(), 2)
             self._solver = FlowBoardSolver(self._board)
 
-    def run(self):
+    def run(self, skipSolution=False):
         if self._solver.done:
-            self.finished.emit()
-            return
+            if skipSolution and self._solver.solved:
+                self._solver.skipSolution()
+            else:
+                self.finished.emit()
+                return
         self._run = True
         self._startTime = datetime.now()
+        self._endTime = None
         try:
             while self._run and not self._solver.run(20):
-                QCoreApplication.processEvents()
+                while QCoreApplication.hasPendingEvents():
+                    QCoreApplication.processEvents()
         finally:
             self._endTime = datetime.now()
             self.finished.emit()
