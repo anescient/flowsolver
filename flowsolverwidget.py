@@ -65,8 +65,6 @@ class FlowSolverWidget(QWidget):
             self._endTime = datetime.now()
             self.finished.emit()
             self.repaint()
-        print
-        self._solver.printStats()
 
     def stop(self):
         self._run = False
