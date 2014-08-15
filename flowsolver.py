@@ -237,7 +237,7 @@ class FlowGraphSolver(object):
                 self._nextframes = []
                 return
             movesets = self._possibleMoves()
-            msit = movesets.iteritems()
+            msit = iter(movesets)
             best = next(msit)
             for vidx, moves in msit:
                 if len(best[1]) == 1:
@@ -252,15 +252,14 @@ class FlowGraphSolver(object):
                         deque(self.copy(move) for move in leafmoves)
                     return
 
-            # this sort tends to lead to less convoluted paths in solution
-            vidx = best[0]
-            moves = sorted(best[1], \
-                key=lambda v: len(self._reducedgraph.adjacencies(v)))
-            self._nextframes = \
-                deque(self.copy((vidx, to)) for to in moves)
+            vidx, moves = best
+            if len(moves) > 1:
+                target = self._headpairs[vidx // 2][1 - vidx % 2]
+                moves = self._reducedgraph.sortClosest(moves, target)
+            self._nextframes = deque(self.copy((vidx, to)) for to in moves)
 
         def _possibleMoves(self):
-            moves = {}  # vidx : set of vertices to move to
+            movesets = []  # (vidx, set of vertices to move to)
             for pairidx, (v1, v2) in enumerate(self._headpairs):
                 common = self._commoncomponents[pairidx]
                 if common:
@@ -274,15 +273,15 @@ class FlowGraphSolver(object):
                     assert self._graph.adjacent(v1, v2)
                     m1 = set([v2])
                     m2 = set([v1])
-                moves[2 * pairidx] = m1
-                moves[2 * pairidx + 1] = m2
-            return moves
+                movesets.append((2 * pairidx, m1))
+                movesets.append((2 * pairidx + 1, m2))
+            return movesets
 
         def _leafMoves(self, movesets):
             """return list of (vidx, move) or None"""
             # if any open vertex has 0 or 1 adjacent open vertices,
             # it must be connected now via some adjacent path head
-            allmoves = reduce(set.union, movesets.values(), set())
+            allmoves = reduce(set.union, (moves for _, moves in movesets))
             leaf = None
             for m in allmoves.intersection(self._reducedgraph.vertices):
                 if len(self._reducedgraph.adjacencies(m)) < 2:
@@ -291,7 +290,7 @@ class FlowGraphSolver(object):
             if leaf is None:
                 return None
             leafmoves = []
-            for vidx, moves in movesets.iteritems():
+            for vidx, moves in movesets:
                 if leaf in moves:
                     leafmoves.append((vidx, leaf))
             return leafmoves

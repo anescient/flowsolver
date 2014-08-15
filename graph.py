@@ -37,6 +37,30 @@ class QueryableSimpleGraph(object):
         else:
             return self._edges[v].intersection(mask)
 
+    def sortClosest(self, vertices, target, mask=None):
+        """
+            Return 'vertices' ordered by increasing distance from 'target'.
+            Unreachable vertices omitted.
+            mask: use only these vertices and their incident edges
+        """
+        toVisit = self._maskVertices(mask)
+        vertices = set(vertices)
+        ordered = []
+        if target in vertices:
+            ordered.append(target)
+            vertices.remove(target)
+        bfs = deque([target])
+        while vertices and bfs:
+            v = bfs.popleft()
+            ext = self.adjacencies(v, toVisit)
+            toVisit -= ext
+            for ev in ext:
+                if ev in vertices:
+                    ordered.append(ev)
+                    vertices.remove(ev)
+                bfs.append(ev)
+        return ordered
+
     def connected(self, v1, v2, mask=None):
         """
             Return True iff there is some path from v1 to v2.
@@ -486,6 +510,9 @@ class OnlineReducedGraph(object):
     def componentsAdjacencies(self, v, kset):
         mask = reduce(set.union, map(self._components.get, kset))
         return self._graph.adjacencies(v, mask)
+
+    def sortClosest(self, vertices, target):
+        return self._graph.sortClosest(vertices, target, self._vertices)
 
     def isSeparator(self, v):
         return v in self._separators
