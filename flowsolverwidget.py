@@ -59,7 +59,8 @@ class FlowSolverWidget(QWidget):
         self._endTime = None
         try:
             while self._run and not self._solver.run(20):
-                QCoreApplication.processEvents()
+                while QCoreApplication.hasPendingEvents():
+                    QCoreApplication.processEvents()
         finally:
             self._endTime = datetime.now()
             self.finished.emit()
