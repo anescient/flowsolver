@@ -10,11 +10,13 @@ class FlowGraphSolver(object):
 
     class _Frame(object):
 
-        def __init__(self, graph, reducedgraph, headpairs, commoncomponents):
+        def __init__(self, graph, reducedgraph, \
+                           headpairs, commoncomponents, blocks):
             self._graph = graph
             self._reducedgraph = reducedgraph
             self._headpairs = headpairs
             self._commoncomponents = commoncomponents
+            self._blocks = blocks
             self._nextframes = None
             self._aborted = False
             self._coverstate = None
@@ -56,7 +58,8 @@ class FlowGraphSolver(object):
 
         def copy(self, move=None):
             frame = self.__class__(self._graph, self._reducedgraph, \
-                                   self._headpairs, self._commoncomponents)
+                                   self._headpairs, self._commoncomponents, \
+                                   self._blocks)
             if move:
                 frame.applyMove(*move)
             return frame
@@ -73,9 +76,15 @@ class FlowGraphSolver(object):
             if to == other:
                 self._headpairs.pop(pairidx)
                 self._commoncomponents.pop(pairidx)
+                self._blocks = list(self._blocks)
+                self._blocks.pop(pairidx)
             else:
                 self._headpairs[pairidx] = \
                     (to, other) if to < other else (other, to)
+                if to in self._graph.bridgeGroups:
+                    self._blocks = list(self._blocks)
+                    self._blocks[pairidx] = self._blocks[pairidx].copy()
+                    self._blocks[pairidx].add(self._graph.bridgeGroups[to])
                 self._reducedgraph = self._reducedgraph.copy()
                 self._closeVertex(to)
 
@@ -237,6 +246,9 @@ class FlowGraphSolver(object):
                 self._nextframes = []
                 return
             movesets = self._possibleMoves()
+            if movesets is None:
+                self._nextframes = []
+                return
             msit = iter(movesets)
             best = next(msit)
             for vidx, moves in msit:
@@ -265,10 +277,14 @@ class FlowGraphSolver(object):
                 if common:
                     m1 = self._reducedgraph.componentsAdjacencies(v1, common)
                     m2 = self._reducedgraph.componentsAdjacencies(v2, common)
+                    if self._blocks[pairidx]:
+                        m1 -= self._blocks[pairidx]
+                        m2 -= self._blocks[pairidx]
                     if self._graph.adjacent(v1, v2):
                         m1.add(v2)
                         m2.add(v1)
-                    assert m1 and m2
+                    if not m1 or not m2:
+                        return None
                 else:
                     assert self._graph.adjacent(v1, v2)
                     m1 = set([v2])
@@ -308,7 +324,9 @@ class FlowGraphSolver(object):
             for v1, v2 in headpairs:
                 commoncomponents.append(reducedgraph.adjacentComponents(v1) & \
                                         reducedgraph.adjacentComponents(v2))
-            return cls(graph, reducedgraph, headpairs, commoncomponents)
+            blocks = [set() for _ in headpairs]
+            return cls(graph, reducedgraph, \
+                       headpairs, commoncomponents, blocks)
 
         @staticmethod
         def recoverPaths(framestack):

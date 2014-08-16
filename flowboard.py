@@ -44,6 +44,8 @@ class FlowBoard(object):
             return False
         if not all(self.blockageValidAt(cell) for cell in self._blockages):
             return False
+        if self._bridges and len(self._endpoints) < 2:
+            return False
         return True
 
     def hasCompleteEndpoints(self, key):
@@ -127,6 +129,7 @@ class FlowBoardGraph(QueryableSimpleGraph):
         for xy in board.blockages:
             gridgraph.removeVertexAt(xy)
 
+        self._bridgegroups = {}
         for xy in board.bridges:
             x, y = xy
             v = gridgraph.singleVertexAt(xy)
@@ -148,10 +151,17 @@ class FlowBoardGraph(QueryableSimpleGraph):
             gridgraph.addEdge(y_adj.pop(), ypass)
 
             gridgraph.removeVertex(v)
+            self._bridgegroups[xpass] = ypass
+            self._bridgegroups[ypass] = xpass
 
         self._cellToVertex = gridgraph.singleVertexAt
         self._vertexToCell = gridgraph.locationForVertex
         super(FlowBoardGraph, self).__init__(gridgraph.graph.copyEdgeSets())
+
+    @property
+    def bridgeGroups(self):
+        """dictionary of a: b, where b is forbidden to paths including a"""
+        return self._bridgegroups
 
     def cellToVertex(self, cell):
         return self._cellToVertex(cell)
