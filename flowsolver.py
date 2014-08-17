@@ -378,7 +378,7 @@ class FlowGraphSolver(object):
 
         def stats(self):
             stats = "{0} inserts".format(self._inserts)
-            if self._inserts > 0:
+            if self._finds > 0 and self._inserts > 0:
                 stats += ", {0:.2%} hit, {1:.2%} return".format(\
                     self._hits / float(self._finds), \
                     self._hits / float(self._inserts))
