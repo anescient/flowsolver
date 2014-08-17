@@ -49,8 +49,15 @@ class FlowGraphSolver(object):
                 the locations of unconnected path heads.
             """
             if self._coverstate is None:
-                self._coverstate = (frozenset(self._headpairs),
-                                    frozenset(self._reducedgraph.vertices))
+                headstate = []
+                for hp, blocks in izip(self._headpairs, self._blocks):
+                    if blocks:
+                        headstate.append((hp, tuple(blocks)))
+                    else:
+                        headstate.append(hp)
+                headstate = frozenset(headstate)
+                self._coverstate = \
+                    (headstate, frozenset(self._reducedgraph.vertices))
             return self._coverstate
 
         def isSolved(self):
