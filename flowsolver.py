@@ -51,10 +51,7 @@ class FlowGraphSolver(object):
             if self._coverstate is None:
                 headstate = []
                 for hp, blocks in izip(self._headpairs, self._blocks):
-                    if blocks:
-                        headstate.append((hp, tuple(blocks)))
-                    else:
-                        headstate.append(hp)
+                    headstate.append((hp, tuple(blocks)) if blocks else hp)
                 headstate = frozenset(headstate)
                 self._coverstate = \
                     (headstate, frozenset(self._reducedgraph.vertices))
@@ -73,8 +70,7 @@ class FlowGraphSolver(object):
 
         def applyMove(self, vidx, to):
             assert self._moveapplied is None
-            pairidx = vidx // 2
-            subidx = vidx % 2
+            pairidx, subidx = divmod(vidx, 2)
             oldpair = self._headpairs[pairidx]
             head, other = oldpair[subidx], oldpair[1 - subidx]
             self._moveapplied = (head, to)
@@ -331,7 +327,7 @@ class FlowGraphSolver(object):
             for v1, v2 in headpairs:
                 commoncomponents.append(reducedgraph.adjacentComponents(v1) & \
                                         reducedgraph.adjacentComponents(v2))
-            blocks = [set() for _ in headpairs]
+            blocks = [set()] * len(headpairs)
             return cls(graph, reducedgraph, \
                        headpairs, commoncomponents, blocks)
 
@@ -399,11 +395,11 @@ class FlowGraphSolver(object):
 
     @property
     def done(self):
-        return not self._stack or self._stack[-1].isSolved()
+        return bool(not self._stack or self._stack[-1].isSolved())
 
     @property
     def solved(self):
-        return self._stack and self._stack[-1].isSolved()
+        return bool(self._stack and self._stack[-1].isSolved())
 
     def step(self):
         if not self._stack:
@@ -442,8 +438,7 @@ class FlowGraphSolver(object):
             if self._stack[-1].isSolved():
                 solution = self._immutableFlows()
                 if solution in self._solutions:
-                    self._memo = self._Memo()
-                    self._stack.pop()
+                    self.skipSolution()
                 else:
                     self._solutions.add(solution)
                     return True

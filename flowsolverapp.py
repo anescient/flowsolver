@@ -148,7 +148,7 @@ class FlowSolvingPopup(QDialog):
         self._setMessage("running")
         self._againButton.setVisible(False)
         self._abortButton.setText("cancel")
-        self._timer.start(100)
+        self._timer.start(70)
         self._solverWidget.run(skipSolution=again)
 
     def _setMessage(self, msg):
@@ -156,18 +156,16 @@ class FlowSolvingPopup(QDialog):
 
     def _getTimerStr(self):
         dt = self._solverWidget.timeElapsed
-        dm = dt.seconds // 60
-        ds = dt.seconds - dm * 60
-        dh = dm // 60
-        dm -= dh * 60
+        dm, ds = divmod(dt.seconds, 60)
+        dh, dm = divmod(dm, 60)
         dh += dt.days * 24
         return "{0}:{1:02}:{2:02}".format(dh, dm, ds)
 
-    @pyqtSlot()
-    def _solverFinished(self):
+    @pyqtSlot(bool)
+    def _solverFinished(self, solved):
         self._timer.stop()
         msg = "finished after " + self._getTimerStr()
-        if self._solverWidget.solved:
+        if solved:
             self._againButton.setVisible(True)
         else:
             msg += ", no solution found"

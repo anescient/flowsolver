@@ -9,7 +9,7 @@ from flowsolver import FlowBoardSolver
 
 class FlowSolverWidget(QWidget):
 
-    finished = pyqtSignal()
+    finished = pyqtSignal(bool)
 
     def __init__(self):
         super(FlowSolverWidget, self).__init__()
@@ -26,13 +26,7 @@ class FlowSolverWidget(QWidget):
     def timeElapsed(self):
         if self._startTime is None:
             return timedelta(0)
-        if self._endTime is None:
-            return datetime.now() - self._startTime
-        return self._endTime - self._startTime
-
-    @property
-    def solved(self):
-        return False if self._solver is None else self._solver.solved
+        return (self._endTime or datetime.now()) - self._startTime
 
     def setBoard(self, board):
         self._startTime = None
@@ -52,7 +46,7 @@ class FlowSolverWidget(QWidget):
             if skipSolution and self._solver.solved:
                 self._solver.skipSolution()
             else:
-                self.finished.emit()
+                self.finished.emit(self._solver.solved)
                 return
         self._run = True
         self._startTime = datetime.now()
@@ -63,7 +57,7 @@ class FlowSolverWidget(QWidget):
                     QCoreApplication.processEvents()
         finally:
             self._endTime = datetime.now()
-            self.finished.emit()
+            self.finished.emit(self._solver.solved)
             self.repaint()
         print
         self._solver.printStats()
