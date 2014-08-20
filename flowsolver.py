@@ -190,47 +190,27 @@ class FlowGraphSolver(object):
         def biconnectedUnsolvable(self):
             if not self._reducedgraph.separatorsChanged:
                 return False  # assume parent frames have been checked
-
-            # check if any biconnected component cannot be covered
-            for k, vset in self._reducedgraph.leafComponents():
-                for common, (v1, v2) in izip(self._commoncomponents, \
-                                             self._headpairs):
-                    if k not in common:
-                        continue
-                    if self._graph.adjacencies(v1, vset):
-                        break
-                    if self._graph.adjacencies(v2, vset):
-                        break
-                else:
-                    return True
-
-            # check if any cut vertex must be used by more than one pair
-            checkpairs = {}  # component: list of (v1, v2)
-            for common, hp in izip(self._commoncomponents, self._headpairs):
-                if len(common) == 1 and not self._graph.adjacent(*hp):
-                    k = next(iter(common))
-                    if k not in checkpairs:
-                        checkpairs[k] = []
-                    checkpairs[k].append(hp)
-            if any(len(pairs) > 1 for pairs in checkpairs.values()):
-                bf, bfmap, bfseps = self._reducedgraph.blockForest()
-                for c_k, pairs in checkpairs.iteritems():
-                    if len(pairs) < 2:
-                        continue
-                    bfseps_used = set()
-                    for v1, v2 in pairs:
-                        v1_in = set(map(bfmap.get, \
-                            self._reducedgraph.componentAdjacencies(v1, c_k)))
-                        v2_in = set(map(bfmap.get, \
-                            self._reducedgraph.componentAdjacencies(v2, c_k)))
-                        p = bfseps.copy()
-                        for a, b in product(v1_in, v2_in):
-                            p &= set(bf.shortestPath(a, b))
-                        if p & bfseps_used:
+            bf, bfmap, bfseps = self._reducedgraph.blockForest()
+            bf_covered = set()
+            bfseps_used = set()
+            for cc, (v1, v2) in izip(self._commoncomponents, self._headpairs):
+                doconflict = len(cc) == 1 and not self._graph.adjacent(v1, v2)
+                for c_k in cc:
+                    v1_in = set(map(bfmap.get, \
+                        self._reducedgraph.componentAdjacencies(v1, c_k)))
+                    v2_in = set(map(bfmap.get, \
+                        self._reducedgraph.componentAdjacencies(v2, c_k)))
+                    pcommon = bfseps.copy() if doconflict else None
+                    for a, b in product(v1_in, v2_in):
+                        p = set(bf.shortestPath(a, b))
+                        bf_covered |= p
+                        if doconflict:
+                            pcommon &= p
+                    if doconflict:
+                        if pcommon & bfseps_used:
                             return True
-                        bfseps_used |= p
-
-            return False
+                        bfseps_used |= pcommon
+            return bf_covered - bfseps != set(bfmap.values()) - bfseps
 
         def takeNextFrame(self):
             assert not self.aborted
