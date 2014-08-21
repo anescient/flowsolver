@@ -34,8 +34,7 @@ class FlowGraphSolver(object):
         def hasNext(self):
             if self.aborted:
                 return False
-            if self._nextframes is None:
-                self._generateNextFrames()
+            self._generateNextFrames()
             return len(self._nextframes) > 0
 
         @property
@@ -51,10 +50,7 @@ class FlowGraphSolver(object):
             if self._coverstate is None:
                 headstate = []
                 for hp, blocks in izip(self._headpairs, self._blocks):
-                    if blocks:
-                        headstate.append((hp, tuple(blocks)))
-                    else:
-                        headstate.append(hp)
+                    headstate.append((hp, tuple(blocks)) if blocks else hp)
                 headstate = frozenset(headstate)
                 self._coverstate = \
                     (headstate, frozenset(self._reducedgraph.vertices))
@@ -73,8 +69,7 @@ class FlowGraphSolver(object):
 
         def applyMove(self, vidx, to):
             assert self._moveapplied is None
-            pairidx = vidx // 2
-            subidx = vidx % 2
+            pairidx, subidx = divmod(vidx, 2)
             oldpair = self._headpairs[pairidx]
             head, other = oldpair[subidx], oldpair[1 - subidx]
             self._moveapplied = (head, to)
@@ -195,52 +190,31 @@ class FlowGraphSolver(object):
         def biconnectedUnsolvable(self):
             if not self._reducedgraph.separatorsChanged:
                 return False  # assume parent frames have been checked
-
-            # check if any biconnected component cannot be covered
-            for k, vset in self._reducedgraph.leafComponents():
-                for common, (v1, v2) in izip(self._commoncomponents, \
-                                             self._headpairs):
-                    if k not in common:
-                        continue
-                    if self._graph.adjacencies(v1, vset):
-                        break
-                    if self._graph.adjacencies(v2, vset):
-                        break
-                else:
-                    return True
-
-            # check if any cut vertex must be used by more than one pair
-            checkpairs = {}  # component: list of (v1, v2)
-            for common, hp in izip(self._commoncomponents, self._headpairs):
-                if len(common) == 1 and not self._graph.adjacent(*hp):
-                    k = next(iter(common))
-                    if k not in checkpairs:
-                        checkpairs[k] = []
-                    checkpairs[k].append(hp)
-            if any(len(pairs) > 1 for pairs in checkpairs.values()):
-                bf, bfmap, bfseps = self._reducedgraph.blockForest()
-                for c_k, pairs in checkpairs.iteritems():
-                    if len(pairs) < 2:
-                        continue
-                    bfseps_used = set()
-                    for v1, v2 in pairs:
-                        v1_in = set(map(bfmap.get, \
-                            self._reducedgraph.componentAdjacencies(v1, c_k)))
-                        v2_in = set(map(bfmap.get, \
-                            self._reducedgraph.componentAdjacencies(v2, c_k)))
-                        p = bfseps.copy()
-                        for a, b in product(v1_in, v2_in):
-                            p &= set(bf.shortestPath(a, b))
-                        if p & bfseps_used:
+            bf, bfmap, bfseps = self._reducedgraph.blockForest()
+            bf_covered = set()
+            bfseps_used = set()
+            for cc, (v1, v2) in izip(self._commoncomponents, self._headpairs):
+                doconflict = len(cc) == 1 and not self._graph.adjacent(v1, v2)
+                for c_k in cc:
+                    v1_in = set(map(bfmap.get, \
+                        self._reducedgraph.componentAdjacencies(v1, c_k)))
+                    v2_in = set(map(bfmap.get, \
+                        self._reducedgraph.componentAdjacencies(v2, c_k)))
+                    pcommon = bfseps.copy() if doconflict else None
+                    for a, b in product(v1_in, v2_in):
+                        p = set(bf.shortestPath(a, b))
+                        bf_covered |= p
+                        if doconflict:
+                            pcommon &= p
+                    if doconflict:
+                        if pcommon & bfseps_used:
                             return True
-                        bfseps_used |= p
-
-            return False
+                        bfseps_used |= pcommon
+            return bf_covered - bfseps != set(bfmap.values()) - bfseps
 
         def takeNextFrame(self):
             assert not self.aborted
-            if self._nextframes is None:
-                self._generateNextFrames()
+            self._generateNextFrames()
             return self._nextframes.popleft()
 
         def abort(self):
@@ -248,36 +222,38 @@ class FlowGraphSolver(object):
             self._aborted = True
 
         def _generateNextFrames(self):
-            assert self._nextframes is None
-            if not self._headpairs:
-                self._nextframes = []
-                return
+            if self._nextframes is None:
+                self._nextframes = \
+                    deque(self.copy(m) for m in self._bestMoves())
+
+        def _bestMoves(self):
             movesets = self._possibleMoves()
             if movesets is None:
-                self._nextframes = []
-                return
-            msit = iter(movesets)
-            best = next(msit)
-            for vidx, moves in msit:
-                if len(best[1]) == 1:
-                    break
-                if len(moves) < len(best[1]):
-                    best = (vidx, moves)
+                return []
+            if len(movesets) == 1:
+                vidx, moves = movesets[0]
+                return ((vidx, to) for to in moves)
+            leafmoves = self._leafMoves(movesets)
+            if leafmoves:
+                return leafmoves
 
-            if len(best[1]) > 1:
-                leafmoves = self._leafMoves(movesets)
-                if leafmoves:
-                    self._nextframes = \
-                        deque(self.copy(move) for move in leafmoves)
-                    return
+            # not sure why this helps as much as it does
+            # maybe by increasing chance of memo hit?
+            # re-evaluate this if memoization is significantly changed
+            bcs, _ = self._reducedgraph.biconnectedComponents()
+            if len(bcs) > 1:
+                focus = min(bcs, key=len)
+                focusmovesets = [ms for ms in movesets if ms[1] & focus]
+                movesets = focusmovesets or movesets
 
-            vidx, moves = best
-            if len(moves) > 1:
-                target = self._headpairs[vidx // 2][1 - vidx % 2]
-                moves = self._reducedgraph.sortClosest(moves, target)
-            self._nextframes = deque(self.copy((vidx, to)) for to in moves)
+            vidx, moves = min(movesets, key=lambda ms: len(ms[1]))
+            target = self._headpairs[vidx // 2][1 - vidx % 2]
+            moves = self._reducedgraph.sortClosest(moves, target)
+            return ((vidx, to) for to in moves)
 
         def _possibleMoves(self):
+            if not self._headpairs:
+                return None
             movesets = []  # (vidx, set of vertices to move to)
             for pairidx, (v1, v2) in enumerate(self._headpairs):
                 common = self._commoncomponents[pairidx]
@@ -296,14 +272,20 @@ class FlowGraphSolver(object):
                     assert self._graph.adjacent(v1, v2)
                     m1 = set([v2])
                     m2 = set([v1])
-                movesets.append((2 * pairidx, m1))
-                movesets.append((2 * pairidx + 1, m2))
+                ms1 = (2 * pairidx, m1)
+                ms2 = (2 * pairidx + 1, m2)
+                if len(m1) == 1:
+                    return [ms1]
+                if len(m2) == 1:
+                    return [ms2]
+                movesets.append(ms1)
+                movesets.append(ms2)
             return movesets
 
         def _leafMoves(self, movesets):
             """return list of (vidx, move) or None"""
             # if any open vertex has 0 or 1 adjacent open vertices,
-            # it must be connected now via some adjacent path head
+            # it must be used by some adjacent path head
             allmoves = reduce(set.union, (moves for _, moves in movesets))
             leaf = None
             for m in allmoves.intersection(self._reducedgraph.vertices):
@@ -331,7 +313,7 @@ class FlowGraphSolver(object):
             for v1, v2 in headpairs:
                 commoncomponents.append(reducedgraph.adjacentComponents(v1) & \
                                         reducedgraph.adjacentComponents(v2))
-            blocks = [set() for _ in headpairs]
+            blocks = [set()] * len(headpairs)
             return cls(graph, reducedgraph, \
                        headpairs, commoncomponents, blocks)
 
@@ -378,7 +360,7 @@ class FlowGraphSolver(object):
 
         def stats(self):
             stats = "{0} inserts".format(self._inserts)
-            if self._inserts > 0:
+            if self._finds > 0 and self._inserts > 0:
                 stats += ", {0:.2%} hit, {1:.2%} return".format(\
                     self._hits / float(self._finds), \
                     self._hits / float(self._inserts))
@@ -399,11 +381,11 @@ class FlowGraphSolver(object):
 
     @property
     def done(self):
-        return not self._stack or self._stack[-1].isSolved()
+        return bool(not self._stack or self._stack[-1].isSolved())
 
     @property
     def solved(self):
-        return self._stack and self._stack[-1].isSolved()
+        return bool(self._stack and self._stack[-1].isSolved())
 
     def step(self):
         if not self._stack:
@@ -442,8 +424,7 @@ class FlowGraphSolver(object):
             if self._stack[-1].isSolved():
                 solution = self._immutableFlows()
                 if solution in self._solutions:
-                    self._memo = self._Memo()
-                    self._stack.pop()
+                    self.skipSolution()
                 else:
                     self._solutions.add(solution)
                     return True

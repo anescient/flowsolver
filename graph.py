@@ -362,17 +362,6 @@ class OnlineReducedGraph(object):
     def components(self):
         return self._components
 
-    def leafComponents(self):
-        """
-            Return sets of vertices from biconnected components having
-            only one separator, minus the separator.
-        """
-        for bc_k, bc in self._biconComponents.iteritems():
-            seps = self._separatorMap[bc_k]
-            if len(seps) == 1:
-                c_k = self._findComponent(next(iter(bc)))
-                yield (c_k, bc - seps)
-
     def blockForest(self):
         bf = SimpleGraph()
         vertexmap = {}  # vertex: vertex in block forest

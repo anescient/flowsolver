@@ -91,6 +91,9 @@ class FlowBoardEditor(QWidget):
                 self._cellHover(cell, event.buttons())
             self.repaint()
 
+    def wheelEvent(self, event):
+        self.toolbar.tools.stepEndpointSelection(event.delta() < 0)
+
     def _cellClicked(self, cell, button):
         if button == Qt.LeftButton:
             tool = self.selectedTool
@@ -359,6 +362,13 @@ class FlowToolChooser(QWidget):
                 button.setSelected(True)
                 return
         raise ValueError("no such tool")
+
+    def stepEndpointSelection(self, forward=True):
+        if isinstance(self.selected, FlowToolEndpoint):
+            keys = sorted(FlowPalette)
+            i = keys.index(self.selected.endpointKey)
+            i = (i + (1 if forward else -1)) % len(keys)
+            self.selectEndpoint(keys[i])
 
     def selectBridge(self):
         self._bridgeToolButton.setSelected(True)
