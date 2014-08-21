@@ -2,7 +2,6 @@
 
 print "loading testbench"
 
-import random
 from PyQt4.QtCore import QPoint, QLine, QLineF, QSize, pyqtSlot
 from PyQt4.QtGui import QPushButton, QDialog, QStatusBar, QLayout, \
     QBoxLayout, QWidget, QPen, QColor
@@ -40,10 +39,7 @@ class TestWidget(QWidget):
         self.repaint()
 
     def run(self):
-        v1, v2 = random.sample(list(self._graph.vertices), 2)
-        self._marks = [v1, v2]
-        p = self._graph.shortestPath(v1, v2)
-        self._paths = [p] if p else []
+        self._paths = self._graph.paths()
         self.repaint()
 
     def paintEvent(self, event):
@@ -68,9 +64,10 @@ class TestWidget(QWidget):
                 self._markVerts(ptr, k, p)
                 k += 1
         if self._paths:
-            for p in self._paths:
+            for i, p in enumerate(self._paths):
                 edges = [(a, b) for a, b in zip(p, p[1:])]
-                self._drawEdges(ptr, edges, True)
+                ci = i / float(len(self._paths))
+                self._drawEdges(ptr, edges, True, ci)
         if self._edges:
             self._drawEdges(ptr, self._edges)
         if self._trees:
@@ -86,23 +83,27 @@ class TestWidget(QWidget):
     def sizeHint(self):
         return QSize(self._size, self._size)
 
-    def _drawEdges(self, ptr, edges, directed=False):
-        c = QColor(255, 255, 255, 100)
+    def _drawEdges(self, ptr, edges, directed=False, colorindex=None):
+        c = QColor(255, 255, 255)
+        if colorindex is not None:
+            c.setHslF(colorindex, 0.8, 0.7)
+        c.setAlphaF(0.5)
         ptr.setPen(QPen(c, 2))
+        ptr.setBrush(c)
         for _, edge in enumerate(edges):
-            #c.setHslF(0.1 * float(i % 10), 0.8, 0.5)
-            #ptr.setPen(QPen(c, 2))
             c1, c2 = self._graph.verticesToCells(edge)
             p1, p2 = self._grid.cellCenter(c1), self._grid.cellCenter(c2)
             line = QLineF(QLine(p2, p1))
             ptr.drawLine(line)
             if directed:
+                arrow = [line.p1()]
                 a = line.angle()
                 line.setLength(self._grid.minDimension * 0.3)
                 line.setAngle(a + 15)
-                ptr.drawLine(line)
+                arrow.append(line.p2())
                 line.setAngle(a - 15)
-                ptr.drawLine(line)
+                arrow.append(line.p2())
+                ptr.drawConvexPolygon(*arrow)
 
     def _markVerts(self, ptr, key, verts):
         key = (key - min(FlowPalette)) % len(FlowPalette) + min(FlowPalette)

@@ -37,6 +37,26 @@ class QueryableSimpleGraph(object):
         else:
             return self._edges[v].intersection(mask)
 
+    def paths(self):
+        innervs = set(v for v, e in self._edges.iteritems() if len(e) == 2)
+        paths = []
+        while innervs:
+            v = innervs.pop()
+            p = list(self._edges[v])
+            p.insert(1, v)
+            while p[-1] in innervs:
+                innervs.remove(p[-1])
+                ext = (self._edges[p[-1]] - set(p[-2:])).pop()
+                if ext != p[1]:
+                    p.append(ext)
+            while p[0] in innervs:
+                innervs.remove(p[0])
+                ext = (self._edges[p[0]] - set(p[:2])).pop()
+                if ext != p[-2]:
+                    p.insert(0, ext)
+            paths.append(p)
+        return paths
+
     def sortClosest(self, vertices, target, mask=None):
         """
             Return 'vertices' ordered by increasing distance from 'target'.
