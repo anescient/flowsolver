@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from itertools import product
 from graph import SimpleGraph
 
 
@@ -17,13 +18,12 @@ class GraphOntoRectangularGrid(object):
         self._height = height
         self._graph = SimpleGraph()
         self._locationMap = {}  # vertex : location
-        for x in xrange(self._width):
-            for y in xrange(self._height):
-                v = self.pushVertex((x, y))
-                if x > 0:
-                    self._graph.addEdge(v, self.singleVertexAt((x - 1, y)))
-                if y > 0:
-                    self._graph.addEdge(v, self.singleVertexAt((x, y - 1)))
+        for x, y in product(xrange(self._width), xrange(self._height)):
+            v = self.pushVertex((x, y))
+            if x > 0:
+                self._graph.addEdge(v, self.singleVertexAt((x - 1, y)))
+            if y > 0:
+                self._graph.addEdge(v, self.singleVertexAt((x, y - 1)))
 
     @property
     def width(self):
@@ -36,6 +36,10 @@ class GraphOntoRectangularGrid(object):
     @property
     def graph(self):
         return self._graph.asReadOnly()
+
+    def singlesAdjacent(self, xy1, xy2):
+        v1, v2 = map(self.singleVertexAt, (xy1, xy2))
+        return self._graph.adjacent(v1, v2)
 
     def pushVertex(self, xy):
         x, y = xy
@@ -55,6 +59,10 @@ class GraphOntoRectangularGrid(object):
     def addEdge(self, v1, v2):
         self._graph.addEdge(v1, v2)
 
+    def removeUniqueEdge(self, xy1, xy2):
+        v1, v2 = map(self.singleVertexAt, (xy1, xy2))
+        self._graph.removeEdge(v1, v2)
+
     def verticesAt(self, xy):
         """Get the set of any/all vertices mapped to location."""
         return set(k for k, v in self._locationMap.iteritems() if v == xy)
@@ -67,6 +75,13 @@ class GraphOntoRectangularGrid(object):
 
     def adjacenciesAt(self, xy):
         return self._graph.adjacencies(self.singleVertexAt(xy))
+
+    def orthogonalAdjacencies(self, xy):
+        x, y = xy
+        a = self.adjacenciesAt(xy)
+        xa = a & (self.verticesAt((x - 1, y)) | self.verticesAt((x + 1, y)))
+        ya = a & (self.verticesAt((x, y - 1)) | self.verticesAt((x, y + 1)))
+        return xa, ya
 
     def locationForVertex(self, v):
         return self._locationMap[v]
