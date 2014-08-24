@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from itertools import combinations
 from graph import QueryableSimpleGraph
 from gridgraph import GraphOntoRectangularGrid
 
@@ -131,16 +132,9 @@ class FlowBoardGraph(QueryableSimpleGraph):
 
         self._bridgegroups = {}
         for xy in board.bridges:
-            x, y = xy
-            v = gridgraph.singleVertexAt(xy)
-
-            x_adj = gridgraph.adjacenciesAt(xy).intersection(\
-                gridgraph.verticesAt((x - 1, y)).union(\
-                gridgraph.verticesAt((x + 1, y))))
-            y_adj = gridgraph.adjacenciesAt(xy).intersection(\
-                gridgraph.verticesAt((x, y - 1)).union(\
-                gridgraph.verticesAt((x, y + 1))))
+            x_adj, y_adj = gridgraph.orthogonalAdjacencies(xy)
             assert len(x_adj) == 2 and len(y_adj) == 2
+            gridgraph.removeVertexAt(xy)
 
             xpass = gridgraph.pushVertex(xy)
             gridgraph.addEdge(x_adj.pop(), xpass)
@@ -150,9 +144,12 @@ class FlowBoardGraph(QueryableSimpleGraph):
             gridgraph.addEdge(y_adj.pop(), ypass)
             gridgraph.addEdge(y_adj.pop(), ypass)
 
-            gridgraph.removeVertex(v)
             self._bridgegroups[xpass] = ypass
             self._bridgegroups[ypass] = xpass
+
+        for (xy1, k1), (xy2, k2) in combinations(board.endpoints, 2):
+            if k1 != k2 and gridgraph.singlesAdjacent(xy1, xy2):
+                gridgraph.removeUniqueEdge(xy1, xy2)
 
         self._cellToVertex = gridgraph.singleVertexAt
         self._vertexToCell = gridgraph.locationForVertex

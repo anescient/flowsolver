@@ -15,6 +15,10 @@ class FlowSolverAppWindow(QMainWindow):
         self.setWindowTitle("flow solver")
         self.setAcceptDrops(True)
 
+        # toolbars can be hidden/toggled by some kind of default context menu.
+        # this seems to be the only way to make them un-hide-able.
+        self.setContextMenuPolicy(Qt.NoContextMenu)
+
         self._editor = FlowBoardEditor()
         self._editor.toolbar.setFloatable(False)
         self._editor.toolbar.setMovable(False)
