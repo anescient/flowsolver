@@ -210,7 +210,7 @@ class FlowGraphSolver(object):
                         if pcommon & bfseps_used:
                             return True
                         bfseps_used |= pcommon
-            return bf_covered - bfseps != set(bfmap.values()) - bfseps
+            return not (set(bfmap.values()) - bfseps).issubset(bf_covered)
 
         def takeNextFrame(self):
             assert not self.aborted
