@@ -83,6 +83,14 @@ class TestWidget(QWidget):
     def sizeHint(self):
         return QSize(self._size, self._size)
 
+    def _vertsCenter(self, vertices):
+        if not hasattr(vertices, '__iter__'):
+            vertices = [vertices]
+        cells = self._graph.verticesToCells(vertices)
+        xs = [p.x() for p in map(self._grid.cellCenter, cells)]
+        ys = [p.y() for p in map(self._grid.cellCenter, cells)]
+        return QPoint(sum(xs) / len(xs), sum(ys) / len(ys))
+
     def _drawEdges(self, ptr, edges, directed=False, colorindex=None):
         c = QColor(255, 255, 255)
         if colorindex is not None:
@@ -91,8 +99,7 @@ class TestWidget(QWidget):
         ptr.setPen(QPen(c, 2))
         ptr.setBrush(c)
         for _, edge in enumerate(edges):
-            c1, c2 = self._graph.verticesToCells(edge)
-            p1, p2 = self._grid.cellCenter(c1), self._grid.cellCenter(c2)
+            p1, p2 = map(self._vertsCenter, edge)
             line = QLineF(QLine(p2, p1))
             ptr.drawLine(line)
             if directed:
