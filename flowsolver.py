@@ -320,18 +320,19 @@ class FlowSolver(object):
             # if any open vertex has 0 or 1 adjacent open vertices,
             # it must be used by some adjacent path head
             allmoves = reduce(set.union, (moves for _, moves in movesets))
-            leaf = None
+            leafs = []
             for m in allmoves.intersection(self._reducedgraph.vertices):
                 if len(self._reducedgraph.adjacencies(m)) < 2:
-                    leaf = m
-                    break
-            if leaf is None:
-                return None
-            leafmoves = []
-            for vidx, moves in movesets:
-                if leaf in moves:
-                    leafmoves.append((vidx, leaf))
-            return leafmoves
+                    leafs.append(m)
+            for leaf in leafs:
+                vidxs = [vidx for vidx, moves in movesets if leaf in moves]
+                if len(set(vidx // 2 for vidx in vidxs)) == len(vidxs):
+                    # If both heads from a pair can move to the same leaf,
+                    # committing children of this frame to move to the leaf can
+                    # lead to duplicate states in the search.
+                    continue
+                return [(vidx, leaf) for vidx in vidxs]
+            return None
 
         @classmethod
         def initial(cls, puzzle):
@@ -407,7 +408,6 @@ class FlowSolver(object):
             self._stack = []
         self._totalframes = 1
         self._memo = self._Memo()
-        self._solutions = set()
 
     @property
     def done(self):
@@ -452,12 +452,7 @@ class FlowSolver(object):
             while self.step():
                 step = True
             if self._stack[-1].isSolved():
-                solution = self._immutableFlows()
-                if solution in self._solutions:
-                    self.skipSolution()
-                else:
-                    self._solutions.add(solution)
-                    return True
+                return True
             if step and limit is not None:
                 limit -= 1
                 if limit <= 0:
