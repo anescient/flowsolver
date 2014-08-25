@@ -468,8 +468,9 @@ class FlowSolver(object):
 
     def skipSolution(self):
         assert self.solved
+        while self.stepBack():
+            pass
         self._memo = self._Memo()
-        self._stack.pop()
 
     def printStats(self):
         print "{0} visited".format(self._totalframes)
