@@ -37,9 +37,8 @@ class GraphOntoRectangularGrid(object):
     def graph(self):
         return self._graph.asReadOnly()
 
-    def singlesAdjacent(self, xy1, xy2):
-        v1, v2 = map(self.singleVertexAt, (xy1, xy2))
-        return self._graph.adjacent(v1, v2)
+    def getLocationMap(self):
+        return dict((v, tuple(c)) for v, c in self._locationMap.iteritems())
 
     def pushVertex(self, xy):
         x, y = xy
@@ -82,6 +81,3 @@ class GraphOntoRectangularGrid(object):
         xa = a & (self.verticesAt((x - 1, y)) | self.verticesAt((x + 1, y)))
         ya = a & (self.verticesAt((x, y - 1)) | self.verticesAt((x, y + 1)))
         return xa, ya
-
-    def locationForVertex(self, v):
-        return self._locationMap[v]

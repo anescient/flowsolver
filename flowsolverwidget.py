@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from PyQt4.QtCore import QCoreApplication, QSize, pyqtSignal
 from PyQt4.QtGui import QWidget
 from flowpainter import SpacedGrid, FlowBoardPainter
-from flowsolver import FlowBoardSolver
+from flowboard import FlowBoardSolver
 
 
 class FlowSolverWidget(QWidget):

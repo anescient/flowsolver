@@ -5,9 +5,9 @@ print "loading testbench"
 from PyQt4.QtCore import QPoint, QLine, QLineF, QSize, pyqtSlot
 from PyQt4.QtGui import QPushButton, QDialog, QStatusBar, QLayout, \
     QBoxLayout, QWidget, QPen, QColor
-from flowboard import FlowBoardGraph
+from graph import SimpleGraph
+from flowboard import FlowBoardSolver
 from flowpainter import SpacedGrid, FlowBoardPainter, FlowPalette
-from flowsolver import FlowBoardSolver
 
 
 class TestWidget(QWidget):
@@ -17,6 +17,7 @@ class TestWidget(QWidget):
         self.setFixedSize(self.sizeHint())
         self._board = None
         self._grid = None
+        self._cellmap = None
         self._graph = None
         self._solver = None
         self._marks = None
@@ -29,7 +30,8 @@ class TestWidget(QWidget):
         self._board = board
         self._grid = SpacedGrid(\
             self._board.size, self._board.size, self.rect().size(), 2)
-        self._graph = FlowBoardGraph(board)
+        puzzle, self._cellmap = board.getPuzzle()
+        self._graph = SimpleGraph(puzzle.graph)
         self._solver = FlowBoardSolver(board) if board.isValid() else None
         self._marks = []
         self._parts = []
@@ -39,6 +41,9 @@ class TestWidget(QWidget):
         self.repaint()
 
     def run(self):
+        for p in self._paths:
+            if self._graph.adjacent(p[0], p[-1]):
+                self._graph.removeEdge(p[0], p[-1])
         self._paths = self._graph.paths()
         self.repaint()
 
@@ -54,7 +59,7 @@ class TestWidget(QWidget):
                     ptr.drawFlow(self._grid, key, cells)
         if self._marks:
             for v in self._marks:
-                r = self._grid.cellRect(self._graph.vertexToCell(v))
+                r = self._grid.cellRect(self._cellmap[v])
                 margin = self._grid.minDimension // 4
                 r.adjust(margin, margin, -margin, -margin)
                 ptr.drawEndpoint(r, color=QColor.fromHslF(0, 0, 0.4))
@@ -86,7 +91,7 @@ class TestWidget(QWidget):
     def _vertsCenter(self, vertices):
         if not hasattr(vertices, '__iter__'):
             vertices = [vertices]
-        cells = self._graph.verticesToCells(vertices)
+        cells = map(self._cellmap.get, vertices)
         xs = [p.x() for p in map(self._grid.cellCenter, cells)]
         ys = [p.y() for p in map(self._grid.cellCenter, cells)]
         return QPoint(sum(xs) / len(xs), sum(ys) / len(ys))
@@ -122,7 +127,7 @@ class TestWidget(QWidget):
         row = (key - 1) // div
         col = (key - 1) % div
         offset = QPoint(col * marksize, row * marksize)
-        for cell in self._graph.verticesToCells(verts):
+        for cell in map(self._cellmap.get, verts):
             r_mark.moveTopLeft(self._grid.cellRect(cell).topLeft() + offset)
             ptr.drawEndpoint(r_mark, key)
 

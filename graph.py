@@ -10,6 +10,8 @@ class QueryableSimpleGraph(object):
         # vertex : set of connected vertices (doubly-linked)
         # keys are vertex collection (isolated vertices have empty set)
 
+    def assertSimple(self):
+        """Test edge sets for correct simple graph properties."""
         for v, adj in edgeSets.iteritems():
             assert v not in adj
             for u in adj:
@@ -290,6 +292,8 @@ class QueryableSimpleGraph(object):
 
 class SimpleGraph(QueryableSimpleGraph):
     def __init__(self, edgeSets=None):
+        if isinstance(edgeSets, QueryableSimpleGraph):
+            edgeSets = edgeSets.copyEdgeSets()
         super(SimpleGraph, self).__init__(edgeSets or {})
 
     def asReadOnly(self):
