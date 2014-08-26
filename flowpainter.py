@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from PyQt4.QtCore import Qt, QPoint, QLine, QSize, QRect
-from PyQt4.QtGui import QPainter, QColor, QPen
+from PyQt4.QtGui import QPainter, QColor, QPen, QImage
 
 
 FlowPalette = {
@@ -66,7 +66,12 @@ class FlowBoardPainter(QPainter):
     def drawCellHighlight(self, grid, cell):
         self.fillRect(grid.cellRect(cell), self._highlightcolor)
 
-    def drawFlow(self, grid, key, cells):
+    def drawFlows(self, grid, solver):
+        for key, cells in solver.getFlows():
+            if len(cells) > 1:
+                self._drawFlow(grid, key, cells)
+
+    def _drawFlow(self, grid, key, cells):
         assert len(cells) > 1
         linew = int(grid.minDimension * self._flowwidth)
         self.setPen(QPen(FlowPalette[key], linew, \
@@ -103,6 +108,23 @@ class FlowBoardPainter(QPainter):
         self.fillRect(corner, color)
         corner.moveBottomRight(rect.bottomRight())
         self.fillRect(corner, color)
+
+    @staticmethod
+    def renderImage(board, solver=None):
+        cellsize = 33
+        spacing = 1
+        imgsize = board.size * (cellsize + spacing) + spacing
+        imgsize = QSize(imgsize, imgsize)
+        img = QImage(imgsize, QImage.Format_ARGB32_Premultiplied)
+        grid = SpacedGrid(board.size, board.size, imgsize, spacing)
+        ptr = FlowBoardPainter(img)
+        ptr.fillBackground()
+        ptr.drawGrid(grid)
+        ptr.drawBoardFeatures(grid, board)
+        if solver:
+            ptr.drawFlows(grid, solver)
+        ptr.end()
+        return img.convertToFormat(QImage.Format_RGB32)
 
     @staticmethod
     def _flowLines(grid, cells):

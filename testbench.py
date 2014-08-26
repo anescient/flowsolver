@@ -54,9 +54,7 @@ class TestWidget(QWidget):
         ptr.drawGrid(self._grid)
         ptr.drawBoardFeatures(self._grid, self._board)
         if self._solver:
-            for key, cells in self._solver.getFlows():
-                if len(cells) > 1:
-                    ptr.drawFlow(self._grid, key, cells)
+            ptr.drawFlows(self._grid, self._solver)
         if self._marks:
             for v in self._marks:
                 r = self._grid.cellRect(self._cellmap[v])
