@@ -5,30 +5,30 @@ from PyQt4.QtGui import QPainter, QColor, QPen, QImage
 
 
 FlowPalette = {
-    1: QColor(255, 0, 0),  # red
-    2: QColor(0, 128, 0),  # green
-    3: QColor(0, 0, 255),  # blue
-    4: QColor(255, 255, 0),  # yellow
-    5: QColor(255, 128, 0),  # orange
-    6: QColor(0, 255, 255),  # turquoise
-    7: QColor(255, 0, 255),  # violet
-    8: QColor(165, 44, 41),  # dark red
-    9: QColor(128, 0, 128),  # dark violet
-    10: QColor(255, 255, 255),  # white
-    11: QColor(165, 165, 165),  # grey
-    12: QColor(0, 255, 0),  # bright green
-    13: QColor(189, 182, 107),  # beige
-    14: QColor(0, 0, 140),  # dark blue
-    15: QColor(0, 130, 132),  # dark turquoise
-    16: QColor(235, 77, 139)}  # pink
+    1: ((255, 0, 0), (114, 57, 57)),  # red
+    2: ((0, 128, 0), (57, 85, 57)),  # green
+    3: ((0, 0, 255), (57, 57, 114)),  # blue
+    4: ((238, 238, 0), (110, 110, 57)),  # yellow
+    5: ((255, 128, 0), (114, 85, 57)),  # orange
+    6: ((0, 255, 255), (57, 114, 114)),  # turquoise
+    7: ((255, 0, 255), (114, 57, 114)),  # violet
+    8: ((165, 42, 42), (95, 66, 66)),  # dark red
+    9: ((128, 0, 128), (85, 57, 85)),  # dark violet
+    10: ((255, 255, 255), (114, 114, 114)),  # white
+    11: ((165, 165, 165), (95, 95, 95)),  # grey
+    12: ((0, 255, 0), (57, 114, 57)),  # bright green
+    13: ((189, 182, 107), (100, 98, 81)),  # beige
+    14: ((0, 0, 140), (63, 57, 88)),  # dark blue
+    15: ((0, 128, 128), (57, 85, 85)),  # dark turquoise
+    16: ((255, 20, 147), (114, 61, 90))}  # pink
 
 
 class FlowBoardPainter(QPainter):
 
     _bgcolor = QColor(0, 0, 0)
-    _gridcolor = QColor(81, 80, 62)
+    _gridcolor = QColor(100, 100, 55)
     _highlightcolor = QColor(34, 51, 44)
-    _flowwidth = 0.3
+    _flowwidth = 0.33
 
     def __init__(self, target):
         self._target = target
@@ -66,6 +66,12 @@ class FlowBoardPainter(QPainter):
     def drawCellHighlight(self, grid, cell):
         self.fillRect(grid.cellRect(cell), self._highlightcolor)
 
+    def drawFlowHighlights(self, grid, solver):
+        for key, cells in solver.getFlows():
+            c = QColor(*FlowPalette[key][1])
+            for cell in cells:
+                self.fillRect(grid.cellRect(cell), c)
+
     def drawFlows(self, grid, solver):
         for key, cells in solver.getFlows():
             if len(cells) > 1:
@@ -74,13 +80,13 @@ class FlowBoardPainter(QPainter):
     def _drawFlow(self, grid, key, cells):
         assert len(cells) > 1
         linew = int(grid.minDimension * self._flowwidth)
-        self.setPen(QPen(FlowPalette[key], linew, \
+        self.setPen(QPen(QColor(*FlowPalette[key][0]), linew, \
             cap=Qt.RoundCap, join=Qt.RoundJoin))
         self.drawLines(list(FlowBoardPainter._flowLines(grid, cells)))
 
     def drawEndpoint(self, rect, key=None, color=None):
         if key is not None:
-            color = FlowPalette[key]
+            color = QColor(*FlowPalette[key][0])
         else:
             assert isinstance(color, QColor)
         self.save()
@@ -119,6 +125,8 @@ class FlowBoardPainter(QPainter):
         grid = SpacedGrid(board.size, board.size, imgsize, spacing)
         ptr = FlowBoardPainter(img)
         ptr.fillBackground()
+        if solver and solver.solved:
+            ptr.drawFlowHighlights(grid, solver)
         ptr.drawGrid(grid)
         ptr.drawBoardFeatures(grid, board)
         if solver:

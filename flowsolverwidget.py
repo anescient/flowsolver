@@ -71,6 +71,8 @@ class FlowSolverWidget(QWidget):
         ptr = FlowBoardPainter(self)
         ptr.fillBackground()
         if self._board:
+            if self._solver and self._solver.solved:
+                ptr.drawFlowHighlights(self._grid, self._solver)
             ptr.drawGrid(self._grid)
             ptr.drawBoardFeatures(self._grid, self._board)
             if self._solver:
