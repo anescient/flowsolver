@@ -266,9 +266,9 @@ class FlowSolver(object):
             if len(movesets) == 1:
                 vidx, moves = movesets[0]
                 return ((vidx, to) for to in moves)
-            leafmoves = self._leafMoves(movesets)
-            if leafmoves:
-                return leafmoves
+            leafmove = self._leafMove(movesets)
+            if leafmove:
+                return [leafmove]
 
             # not sure why this helps as much as it does
             # maybe by increasing chance of memo hit?
@@ -315,23 +315,20 @@ class FlowSolver(object):
                 movesets.append(ms2)
             return movesets
 
-        def _leafMoves(self, movesets):
-            """return list of (vidx, move) or None"""
-            # if any open vertex has 0 or 1 adjacent open vertices,
-            # it must be used by some adjacent path head
+        def _leafMove(self, movesets):
+            """return (vidx, move) or None"""
+            # Look for a move to an open vertex which is adjacent only to
+            # one other open vertex and one path head.
+            # If such a move exists now, it must eventually be taken.
             allmoves = reduce(set.union, (moves for _, moves in movesets))
             leafs = []
             for m in allmoves.intersection(self._reducedgraph.vertices):
-                if len(self._reducedgraph.adjacencies(m)) < 2:
+                if len(self._reducedgraph.adjacencies(m)) == 1:
                     leafs.append(m)
             for leaf in leafs:
                 vidxs = [vidx for vidx, moves in movesets if leaf in moves]
-                if len(set(vidx // 2 for vidx in vidxs)) == len(vidxs):
-                    # If both heads from a pair can move to the same leaf,
-                    # committing children of this frame to move to the leaf can
-                    # lead to duplicate states in the search.
-                    continue
-                return [(vidx, leaf) for vidx in vidxs]
+                if len(vidxs) == 1:
+                    return (vidxs[0], leaf)
             return None
 
         @classmethod
