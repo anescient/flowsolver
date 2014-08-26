@@ -414,6 +414,9 @@ class FlowSolver(object):
     def solved(self):
         return bool(self._stack and self._stack[-1].isSolved())
 
+    def stateHash(self):
+        return hash(self._immutableFlows())
+
     def step(self):
         if not self._stack:
             return False
@@ -468,7 +471,7 @@ class FlowSolver(object):
         print "{0} visited".format(self._totalframes)
         print "memo: " + self._memo.stats()
         if self.solved:
-            print "solution", hex(abs(hash(self._immutableFlows())))
+            print "solution", hex(abs(self.stateHash()))
 
     def getFlows(self):
         return self._Frame.recoverPaths(self._stack)

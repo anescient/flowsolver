@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
+from os import path
 from datetime import datetime, timedelta
 from PyQt4.QtCore import QCoreApplication, QSize, pyqtSignal
-from PyQt4.QtGui import QWidget
+from PyQt4.QtGui import QWidget, QImage, QImageWriter
 from flowpainter import SpacedGrid, FlowBoardPainter
 from flowboard import FlowBoardSolver
 
@@ -80,3 +81,12 @@ class FlowSolverWidget(QWidget):
 
     def sizeHint(self):
         return QSize(self._size, self._size)
+
+    def saveImage(self, dirpath):
+        img = QImage(self.sizeHint(), QImage.Format_ARGB32_Premultiplied)
+        self.render(img)
+        filename = hex(abs(self._solver.stateHash()))[2:] + '.png'
+        writer = QImageWriter(path.join(dirpath, filename))
+        writer.setFormat('png')
+        if not writer.write(img):
+            raise Exception(writer.errorString())

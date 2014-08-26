@@ -39,6 +39,7 @@ class FlowBoardPainter(QPainter):
         self.setCompositionMode(QPainter.CompositionMode_Clear)
         self.fillRect(self._target.rect(), self._bgcolor)
         self.setCompositionMode(cm)
+        self.fillRect(self._target.rect(), self._bgcolor)
 
     def traceBound(self, rect):
         self.setPen(QPen(self._gridcolor, 2, join=Qt.MiterJoin))
