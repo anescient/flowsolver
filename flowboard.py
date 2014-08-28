@@ -150,11 +150,6 @@ class FlowBoard(object):
         if cell[1] < self._size - 1:
             yield (cell[0], cell[1] + 1)
 
-    @staticmethod
-    def _adjacent(cell1, cell2):
-        return (abs(cell1[0] - cell2[0]) == 1) != \
-               (abs(cell1[1] - cell2[1]) == 1)
-
 
 class FlowBoardSolver(FlowSolver):
     def __init__(self, board):
@@ -165,6 +160,7 @@ class FlowBoardSolver(FlowSolver):
         self._vertexKey = {}
         for v1, v2 in puzzle.endpointPairs:
             k = board.endpointKeyAt(self._cellmap[v1])
+            assert board.endpointKeyAt(self._cellmap[v2]) == k
             self._vertexKey[v1] = k
             self._vertexKey[v2] = k
 

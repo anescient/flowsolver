@@ -4,6 +4,11 @@ from PyQt4.QtCore import Qt, QPoint, QLine, QSize, QRect
 from PyQt4.QtGui import QPainter, QColor, QPen, QImage
 
 
+# key: ((r, g, b), (r, g, b))
+# The first color is used to render endpoints and paths.
+# The second color is the corresponding background/highlight.
+# The key values are arbitrary, but their numerical order is not.
+# The game allocates these colors to endpoint pairs in this order.
 FlowPalette = {
     1: ((255, 0, 0), (114, 57, 57)),  # red
     2: ((0, 128, 0), (57, 85, 57)),  # green
@@ -139,8 +144,7 @@ class FlowBoardPainter(QPainter):
         assert len(cells) > 1
         cells = FlowBoardPainter._simplifyFlow(cells)
         for start, end in zip(cells, cells[1:]):
-            yield QLine(grid.cellCenter(start), \
-                        grid.cellCenter(end))
+            yield QLine(grid.cellCenter(start), grid.cellCenter(end))
 
     @staticmethod
     def _simplifyFlow(cells):

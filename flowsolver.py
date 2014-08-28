@@ -5,6 +5,16 @@ from itertools import islice, chain, izip, product
 from graph import OnlineReducedGraph
 
 
+# A Flow puzzle consists of:
+#   * a simple graph
+#   * one or more distinct pairs of vertices in the graph ("endpoints")
+#   * zero or more sets of vertices in the graph ("exclusive sets")
+# A solution to a puzzle consists of a collection of simple paths
+# corresponding to the collection of endpoint pairs.
+# The path for each pair ends on the vertices in the pair.
+# All paths are vertex-disjoint and their union spans the graph,
+# in other words, every vertex in the graph appears in exactly one path.
+# Each path may include at most one vertex from each exclusive set.
 class FlowPuzzle(object):
     def __init__(self, graph, endpointPairs, exclusiveSets):
         self._graph = graph
@@ -35,6 +45,10 @@ class FlowPuzzle(object):
         return iter(self._exclusiveSets)
 
     def exclusions(self, v):
+        """
+            For vertex v, return the vertices which cannot be included
+            in a path which includes v.
+        """
         return self._exclusionMap.get(v, None)
 
 
