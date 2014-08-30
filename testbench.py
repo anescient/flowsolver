@@ -180,8 +180,8 @@ def TestSolve(boardfile):
     from timeit import timeit
     board = pickle.load(open(boardfile, 'rb'))
     solver = FlowBoardSolver(board)
-    print "running"
     print
+    print boardfile
     seconds = timeit(solver.run, number=1)
     solver.printStats()
     print "{0:.2f} seconds".format(seconds)

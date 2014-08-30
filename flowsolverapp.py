@@ -192,10 +192,10 @@ class FlowSolvingPopup(QDialog):
 
 if __name__ == '__main__':
     import sys
-    if '-bench' in sys.argv:
-        assert sys.argv[1] == '-bench'
-        assert len(sys.argv) == 3
-        TestSolve(sys.argv[2])
+    if len(sys.argv) > 1:
+        assert len(sys.argv) > 2 and sys.argv[1] == '-bench'
+        for boardfile in sys.argv[2:]:
+            TestSolve(boardfile)
         sys.exit(0)
     app = QApplication(sys.argv)
     main = FlowSolverAppWindow()
