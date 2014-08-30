@@ -74,6 +74,7 @@ class FlowBoardPainter(QPainter):
     def drawFlowHighlights(self, grid, solver):
         for key, cells in solver.getFlows():
             c = QColor(*FlowPalette[key][1])
+            c.setAlphaF(0.8)
             for cell in cells:
                 self.fillRect(grid.cellRect(cell), c)
 
@@ -102,23 +103,23 @@ class FlowBoardPainter(QPainter):
         self.restore()
 
     def drawBridge(self, rect):
-        w = rect.width() * (1.0 - self._flowwidth) * 0.5
-        self._fillCorners(rect, w, self._gridcolor)
-        self._fillCorners(rect, w - 3, self._bgcolor)
+        mindim = int(min(rect.width(), rect.height()))
+        gapw = int(mindim * (1 - self._flowwidth) / 2)
+        x1 = rect.left() + gapw - 1
+        y1 = rect.top() + gapw - 1
+        x2 = rect.right() - rect.width() + mindim - gapw + 1
+        y2 = rect.bottom() - rect.height() + mindim - gapw + 1
+        self.setPen(QPen(self._gridcolor, 2, \
+            cap=Qt.SquareCap, join=Qt.MiterJoin))
+        for x in (x1, x2):
+            self.drawLine(x, rect.top(), x, y1)
+            self.drawLine(x, y2, x, rect.bottom())
+        for y in (y1, y2):
+            self.drawLine(rect.left(), y, x1, y)
+            self.drawLine(x2, y, rect.right(), y)
 
     def drawBlock(self, rect):
         self.fillRect(rect, self._gridcolor)
-
-    def _fillCorners(self, rect, width, color):
-        corner = QRect(0, 0, width, width)
-        corner.moveTopLeft(rect.topLeft())
-        self.fillRect(corner, color)
-        corner.moveTopRight(rect.topRight())
-        self.fillRect(corner, color)
-        corner.moveBottomLeft(rect.bottomLeft())
-        self.fillRect(corner, color)
-        corner.moveBottomRight(rect.bottomRight())
-        self.fillRect(corner, color)
 
     @staticmethod
     def renderImage(board, solver=None):
