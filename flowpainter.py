@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from PyQt4.QtCore import Qt, QPoint, QLine, QSize, QRect
-from PyQt4.QtGui import QPainter, QColor, QBrush, QPen, QImage
+from PyQt4.QtCore import Qt, QPoint, QLine, QSize, QRect, QRectF
+from PyQt4.QtGui import QPainter, QColor, QBrush, QPen, QImage, QRadialGradient
 
 
 # key: ((r, g, b), (r, g, b))
@@ -99,27 +99,33 @@ class FlowBoardPainter(QPainter):
         self.drawEllipse(rect)
         self.restore()
 
-    def drawEndpointRing(self, rect, key, scale=None):
+    def drawEndpointGlow(self, rect, key, scale=None):
         color = QColor(*FlowPalette[key][0])
         rect = FlowBoardPainter._endpointRect(rect, scale)
-        thick = max(2, rect.width() // 10)
-        thick += thick % 2
-        rect = rect.adjusted(thick / 2, thick / 2, -thick / 2, -thick / 2)
+        gradient = QRadialGradient(QRectF(rect).center(), rect.width() / 2)
+        bg = QColor(color)
+        bg.setAlphaF(0.3)
+        gradient.setColorAt(0.7, bg)
+        gradient.setColorAt(1.0, color)
         self.save()
         self.setRenderHint(QPainter.Antialiasing, True)
-        self.setBrush(Qt.NoBrush)
-        self.setPen(QPen(color, thick))
+        self.setBrush(QBrush(gradient))
+        self.setPen(QPen(color, 1))
         self.drawEllipse(rect)
         self.restore()
 
-    def drawBridge(self, rect, style=None):
+    def drawBridge(self, rect, style=None, alpha=None):
         mindim = int(min(rect.width(), rect.height()))
         gapw = int(mindim * (1 - self._flowwidth) / 2)
         x1 = rect.left() + gapw - 1
         y1 = rect.top() + gapw - 1
         x2 = rect.right() - rect.width() + mindim - gapw + 1
         y2 = rect.bottom() - rect.height() + mindim - gapw + 1
-        brush = QBrush(self._gridcolor, style) if style else self._gridcolor
+        c = self._gridcolor
+        if alpha is not None:
+            c = QColor(c)
+            c.setAlphaF(alpha)
+        brush = QBrush(c, style) if style else c
         self.setPen(QPen(brush, 2, cap=Qt.SquareCap, join=Qt.MiterJoin))
         for x in (x1, x2):
             self.drawLine(x, rect.top(), x, y1)
@@ -128,12 +134,20 @@ class FlowBoardPainter(QPainter):
             self.drawLine(rect.left(), y, x1, y)
             self.drawLine(x2, y, rect.right(), y)
 
-    def clearBlock(self, rect, style=None):
-        brush = QBrush(self._bgcolor, style) if style else self._bgcolor
+    def clearBlock(self, rect, style=None, alpha=None):
+        c = self._bgcolor
+        if alpha is not None:
+            c = QColor(c)
+            c.setAlphaF(alpha)
+        brush = QBrush(c, style) if style else c
         self.fillRect(rect, brush)
 
-    def drawBlock(self, rect, style=None):
-        brush = QBrush(self._gridcolor, style) if style else self._gridcolor
+    def drawBlock(self, rect, style=None, alpha=None):
+        c = self._gridcolor
+        if alpha is not None:
+            c = QColor(c)
+            c.setAlphaF(alpha)
+        brush = QBrush(c, style) if style else c
         self.fillRect(rect, brush)
 
     @staticmethod

@@ -98,15 +98,16 @@ class FlowBoardEditor(QWidget):
     def _drawToolPreview(self, ptr, tool, cell):
         rect = self._grid.cellRect(cell)
         if isinstance(tool, FlowToolEndpoint):
-            ptr.clearBlock(rect, Qt.Dense2Pattern)
-            ptr.drawEndpointRing(rect, key=tool.endpointKey)
+            if self._board.endpointKeyAt(cell) is None:
+                ptr.clearBlock(rect, alpha=0.5)
+            ptr.drawEndpointGlow(rect, key=tool.endpointKey)
         elif isinstance(tool, FlowToolBlock):
-            ptr.drawBlock(rect, Qt.Dense4Pattern)
+            ptr.drawBlock(rect, alpha=0.5)
         elif isinstance(tool, FlowToolClear):
-            ptr.clearBlock(rect, Qt.Dense2Pattern)
+            ptr.clearBlock(rect, alpha=0.5)
         elif isinstance(tool, FlowToolBridge):
-            ptr.clearBlock(rect, Qt.Dense2Pattern)
-            ptr.drawBridge(rect, Qt.Dense4Pattern)
+            ptr.clearBlock(rect, alpha=0.5)
+            ptr.drawBridge(rect, alpha=0.7)
 
     def _cellClicked(self, cell, button):
         if button == Qt.LeftButton:
