@@ -86,8 +86,8 @@ class FlowBoardPainter(QPainter):
     def _drawFlow(self, grid, key, cells):
         assert len(cells) > 1
         linew = int(grid.minDimension * self._flowwidth)
-        self.setPen(QPen(QColor(*FlowPalette[key][0]), linew, \
-            cap=Qt.RoundCap, join=Qt.RoundJoin))
+        self.setPen(QPen(QColor(*FlowPalette[key][0]), linew,
+                    cap=Qt.RoundCap, join=Qt.RoundJoin))
         self.drawLines(list(FlowBoardPainter._flowLines(grid, cells)))
 
     def drawEndpoint(self, rect, key=None, color=None):
@@ -172,10 +172,10 @@ class SpacedGrid(object):
         self._size = size
         assert spacing == int(spacing)
         self._spacing = int(spacing)
-        self._rows = list(SpacedGrid._divideRange(\
-            0, size.height(), rows, spacing))
-        self._columns = list(SpacedGrid._divideRange(\
-            0, size.width(), columns, spacing))
+        self._rows = \
+            list(SpacedGrid._divideRange(0, size.height(), rows, spacing))
+        self._columns = \
+            list(SpacedGrid._divideRange(0, size.width(), columns, spacing))
         self._minheight = min(r[1] - r[0] for r in self._rows)
         self._minwidth = min(c[1] - c[0] for c in self._columns)
 
@@ -248,5 +248,5 @@ class SpacedGrid(object):
         """
         lastmax = (end - start) - spacing
         for i in xrange(divisions):
-            yield (spacing + i * lastmax / divisions, \
+            yield (spacing + i * lastmax / divisions,
                    (i + 1) * lastmax / divisions - 1)

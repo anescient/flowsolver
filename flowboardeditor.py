@@ -128,7 +128,7 @@ class FlowBoardEditor(QWidget):
         return False
 
     def _updateGrid(self):
-        self._grid = SpacedGrid(\
+        self._grid = SpacedGrid(
             self._board.size, self._board.size, self.rect().size(), 2)
 
     def _connectToolbar(self, toolbar):
@@ -390,7 +390,7 @@ class FlowBoardEditorToolBar(QToolBar):
 
     def __init__(self):
         super(FlowBoardEditorToolBar, self).__init__()
-        self.setSizePolicy(\
+        self.setSizePolicy(
             QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum))
 
         boardbox = QBoxLayout(QBoxLayout.TopToBottom)

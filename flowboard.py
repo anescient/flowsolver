@@ -130,12 +130,11 @@ class FlowBoard(object):
 
             exclusiveSets.append(set([xpass, ypass]))
 
-        return (FlowPuzzle(gridgraph.graph, endpointPairs, exclusiveSets), \
+        return (FlowPuzzle(gridgraph.graph, endpointPairs, exclusiveSets),
                 gridgraph.getLocationMap())
 
     def _includesCell(self, cell):
-        return cell[0] >= 0 and cell[0] < self._size and \
-               cell[1] >= 0 and cell[1] < self._size
+        return 0 <= cell[0] < self.size and 0 <= cell[1] < self.size
 
     def _adjacentUnblockedCells(self, cell):
         return set(self._adjacentCells(cell)) - self._blockages
