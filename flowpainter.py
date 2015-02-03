@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from PyQt4.QtCore import Qt, QPoint, QLine, QSize, QRect
-from PyQt4.QtGui import QPainter, QColor, QPen, QImage
+from PyQt4.QtGui import QPainter, QColor, QBrush, QPen, QImage
 
 
 # key: ((r, g, b), (r, g, b))
@@ -32,7 +32,6 @@ class FlowBoardPainter(QPainter):
 
     _bgcolor = QColor(0, 0, 0)
     _gridcolor = QColor(100, 100, 55)
-    _highlightcolor = QColor(34, 51, 44)
     _flowwidth = 0.33
 
     def __init__(self, target):
@@ -60,16 +59,13 @@ class FlowBoardPainter(QPainter):
     def drawBoardFeatures(self, grid, board):
         for cell, key in board.endpoints:
             rect = grid.cellRect(cell)
-            margin = rect.width() // 8
-            rect = rect.adjusted(margin, margin, -margin, -margin)
             self.drawEndpoint(rect, key)
         for cell in board.bridges:
-            self.drawBridge(grid.cellRect(cell))
+            rect = grid.cellRect(cell)
+            self.drawBridge(rect)
         for cell in board.blockages:
-            self.drawBlock(grid.cellRect(cell))
-
-    def drawCellHighlight(self, grid, cell):
-        self.fillRect(grid.cellRect(cell), self._highlightcolor)
+            rect = grid.cellRect(cell)
+            self.drawBlock(rect)
 
     def drawFlowHighlights(self, grid, solver):
         for key, cells in solver.getFlows():
@@ -90,27 +86,41 @@ class FlowBoardPainter(QPainter):
                     cap=Qt.RoundCap, join=Qt.RoundJoin))
         self.drawLines(list(FlowBoardPainter._flowLines(grid, cells)))
 
-    def drawEndpoint(self, rect, key=None, color=None):
+    def drawEndpoint(self, rect, key=None, color=None, style=None, scale=None):
         if key is not None:
             color = QColor(*FlowPalette[key][0])
         else:
             assert isinstance(color, QColor)
+        rect = FlowBoardPainter._endpointRect(rect, scale)
         self.save()
         self.setRenderHint(QPainter.Antialiasing, True)
-        self.setBrush(color)
+        self.setBrush(QBrush(color, style) if style else color)
         self.setPen(QPen(Qt.NoPen))
         self.drawEllipse(rect)
         self.restore()
 
-    def drawBridge(self, rect):
+    def drawEndpointRing(self, rect, key, scale=None):
+        color = QColor(*FlowPalette[key][0])
+        rect = FlowBoardPainter._endpointRect(rect, scale)
+        thick = max(2, rect.width() // 10)
+        thick += thick % 2
+        rect = rect.adjusted(thick / 2, thick / 2, -thick / 2, -thick / 2)
+        self.save()
+        self.setRenderHint(QPainter.Antialiasing, True)
+        self.setBrush(Qt.NoBrush)
+        self.setPen(QPen(color, thick))
+        self.drawEllipse(rect)
+        self.restore()
+
+    def drawBridge(self, rect, style=None):
         mindim = int(min(rect.width(), rect.height()))
         gapw = int(mindim * (1 - self._flowwidth) / 2)
         x1 = rect.left() + gapw - 1
         y1 = rect.top() + gapw - 1
         x2 = rect.right() - rect.width() + mindim - gapw + 1
         y2 = rect.bottom() - rect.height() + mindim - gapw + 1
-        self.setPen(QPen(self._gridcolor, 2, \
-            cap=Qt.SquareCap, join=Qt.MiterJoin))
+        brush = QBrush(self._gridcolor, style) if style else self._gridcolor
+        self.setPen(QPen(brush, 2, cap=Qt.SquareCap, join=Qt.MiterJoin))
         for x in (x1, x2):
             self.drawLine(x, rect.top(), x, y1)
             self.drawLine(x, y2, x, rect.bottom())
@@ -118,8 +128,13 @@ class FlowBoardPainter(QPainter):
             self.drawLine(rect.left(), y, x1, y)
             self.drawLine(x2, y, rect.right(), y)
 
-    def drawBlock(self, rect):
-        self.fillRect(rect, self._gridcolor)
+    def clearBlock(self, rect, style=None):
+        brush = QBrush(self._bgcolor, style) if style else self._bgcolor
+        self.fillRect(rect, brush)
+
+    def drawBlock(self, rect, style=None):
+        brush = QBrush(self._gridcolor, style) if style else self._gridcolor
+        self.fillRect(rect, brush)
 
     @staticmethod
     def renderImage(board, solver=None):
@@ -139,6 +154,19 @@ class FlowBoardPainter(QPainter):
             ptr.drawFlows(grid, solver)
         ptr.end()
         return img.convertToFormat(QImage.Format_RGB32)
+
+    @staticmethod
+    def _endpointRect(rect, scale=None):
+        scale = scale or 0.75
+        dw = 0  # total width adjust
+        dh = 0  # total height adjust
+        if rect.width() > rect.height():
+            dw -= (rect.width() - rect.height())
+        elif rect.height() > rect.width():
+            dh -= (rect.height() - rect.width())
+        dw -= (1.0 - scale) * (rect.width() + dw)
+        dh -= (1.0 - scale) * (rect.height() + dh)
+        return rect.adjusted(-dw / 2, -dh / 2, dw / 2, dh / 2)
 
     @staticmethod
     def _flowLines(grid, cells):

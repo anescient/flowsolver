@@ -35,6 +35,9 @@ class FlowBoard(object):
     def blockages(self):
         return iter(self._blockages)
 
+    def isEmpty(self):
+        return not (self._endpoints or self._bridges or self._blockages)
+
     def isValid(self):
         if not self._endpoints:
             return False
