@@ -7,7 +7,7 @@ from PyQt4.QtGui import QWidget, QToolBar, QComboBox, QButtonGroup, \
     QPushButton, QCheckBox, QGridLayout, QBoxLayout, QSizePolicy, \
     QColor, QPen, QImage
 from flowboard import FlowBoard
-from flowpainter import SpacedGrid, FlowPalette, FlowBoardPainter
+from flowpainter import SpacedGrid, FlowBoardPainter
 
 
 class FlowBoardEditor(QWidget):
@@ -328,7 +328,7 @@ class FlowToolChooser(QWidget):
         layout.setContentsMargins(8, 3, 8, 3)
         layout.setAlignment(Qt.AlignCenter)
 
-        endpointTools = [FlowToolEndpoint(k) for k in sorted(FlowPalette)]
+        endpointTools = map(FlowToolEndpoint, FlowBoardPainter.endpointKeys())
         self._endpointButtons = []
         row = 0
         col = 2
@@ -387,7 +387,7 @@ class FlowToolChooser(QWidget):
 
     def stepEndpointSelection(self, forward=True):
         if isinstance(self.selected, FlowToolEndpoint):
-            keys = sorted(FlowPalette)
+            keys = FlowBoardPainter.endpointKeys()
             i = keys.index(self.selected.endpointKey)
             i = (i + (1 if forward else -1)) % len(keys)
             self.selectEndpoint(keys[i])
