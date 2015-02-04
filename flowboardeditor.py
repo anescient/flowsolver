@@ -102,6 +102,7 @@ class FlowBoardEditor(QWidget):
                 ptr.clearBlock(rect, alpha=0.5)
             ptr.drawEndpointGlow(rect, key=tool.endpointKey)
         elif isinstance(tool, FlowToolBlock):
+            ptr.clearBlock(rect, alpha=0.5)
             ptr.drawBlock(rect, alpha=0.5)
         elif isinstance(tool, FlowToolClear):
             ptr.clearBlock(rect, alpha=0.5)
@@ -203,7 +204,7 @@ class FlowToolClear(FlowTool):
         super(FlowToolClear, self).__init__()
 
     def canApply(self, board, cell):
-        return True
+        return not board.isClear(cell)
 
     def applyAction(self, board, cell):
         board.clear(cell)

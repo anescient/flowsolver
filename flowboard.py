@@ -91,6 +91,11 @@ class FlowBoard(object):
     def hasBlockageAt(self, cell):
         return cell in self._blockages
 
+    def isClear(self, cell):
+        if cell in self._bridges or cell in self._blockages:
+            return False
+        return not any(cell in cells for cells in self._endpoints.values())
+
     def clear(self, cell):
         assert self._includesCell(cell)
         for k, l in self._endpoints.iteritems():

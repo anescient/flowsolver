@@ -115,7 +115,7 @@ class FlowBoardPainter(QPainter):
         gradient = QRadialGradient(QRectF(rect).center(), rect.width() / 2)
         bg = QColor(color)
         bg.setAlphaF(0.3)
-        gradient.setColorAt(0.7, bg)
+        gradient.setColorAt(0.5, bg)
         gradient.setColorAt(1.0, color)
         self.save()
         self.setRenderHint(QPainter.Antialiasing, True)
