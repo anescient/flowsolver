@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
+from itertools import product
 from PyQt4.QtCore import Qt, QPoint, QLine, QSize, QRect, QRectF
-from PyQt4.QtGui import QPainter, QColor, QBrush, QPen, QImage, QRadialGradient
+from PyQt4.QtGui import QPainter, QColor, QBrush, QPen, QImage, \
+    QRadialGradient, QPainterPath
 
 
 # key: ((r, g, b), (r, g, b))
@@ -127,12 +129,13 @@ class FlowBoardPainter(QPainter):
             c.setAlphaF(alpha)
         brush = QBrush(c, style) if style else c
         self.setPen(QPen(brush, 2, cap=Qt.SquareCap, join=Qt.MiterJoin))
-        for x in (x1, x2):
-            self.drawLine(x, rect.top(), x, y1)
-            self.drawLine(x, y2, x, rect.bottom())
-        for y in (y1, y2):
-            self.drawLine(rect.left(), y, x1, y)
-            self.drawLine(x2, y, rect.right(), y)
+        path = QPainterPath()
+        for xx, yy in product([(rect.left(), x1), (rect.right(), x2)],
+                              [(rect.top(), y1), (rect.bottom(), y2)]):
+            path.moveTo(xx[0], yy[1])
+            path.lineTo(xx[1], yy[1])
+            path.lineTo(xx[1], yy[0])
+        self.drawPath(path)
 
     def clearBlock(self, rect, style=None, alpha=None):
         c = self._bgcolor
