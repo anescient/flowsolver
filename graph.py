@@ -12,11 +12,11 @@ class QueryableSimpleGraph(object):
 
     def assertSimple(self):
         """Test edge sets for correct simple graph properties."""
-        for v, adj in edgeSets.iteritems():
+        for v, adj in self._edges.iteritems():
             assert v not in adj
             for u in adj:
-                assert u in edgeSets
-                assert v in edgeSets[u]
+                assert u in self._edges
+                assert v in self._edges[u]
 
     @property
     def vertices(self):
@@ -95,8 +95,8 @@ class QueryableSimpleGraph(object):
         front1, front2 = set([v1]), set([v2])
         while front1:
             toVisit -= front1
-            front1 = reduce(set.union, \
-                (self.adjacencies(v, toVisit) for v in front1))
+            front1 = reduce(set.union,
+                            (self.adjacencies(v, toVisit) for v in front1))
             if front1.intersection(front2):
                 return True
             front1, front2 = front2, front1
@@ -174,8 +174,8 @@ class QueryableSimpleGraph(object):
             if joined:
                 continue
             toVisit -= front
-            front = reduce(set.union, \
-                (self.adjacencies(v, toVisit) for v in front))
+            front = reduce(set.union,
+                           (self.adjacencies(v, toVisit) for v in front))
             if not front:
                 return False
             fronts.append(front)
@@ -332,26 +332,26 @@ class OnlineReducedGraph(object):
         if state is None:
             self._initializeState()
         else:
-            self._keys, \
-            self._vertices, \
-            self._components, \
-            self._biconComponents, \
-            self._separators, \
-            self._biconComponentMap, \
-            self._separatorMap = state
+            (self._keys,
+             self._vertices,
+             self._components,
+             self._biconComponents,
+             self._separators,
+             self._biconComponentMap,
+             self._separatorMap) = state
         self._c_k_deleted = None
         self._c_k_reduced = None
         self._c_kset_new = None
         self._separatorsChanged = False
 
     def copy(self):
-        return OnlineReducedGraph(self._graph, (\
-            self._keys, \
-            self._vertices, \
-            self._components, \
-            self._biconComponents, \
-            self._separators, \
-            self._biconComponentMap, \
+        return OnlineReducedGraph(self._graph, (
+            self._keys,
+            self._vertices,
+            self._components,
+            self._biconComponents,
+            self._separators,
+            self._biconComponentMap,
             self._separatorMap))
 
     @property

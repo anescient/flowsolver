@@ -42,6 +42,7 @@ def _testGraph():
     assert isinstance(g, QueryableSimpleGraph)
     assert not isinstance(g.asReadOnly(), SimpleGraph)
     assert isinstance(g.asReadOnly(), QueryableSimpleGraph)
+    g.assertSimple()
     verts = []
     for i in xrange(10):
         verts.append(g.pushVertex())
@@ -118,6 +119,7 @@ def _testGraph():
     for v in verts[:-1]:
         assert len(g.adjacencies(v)) == 1
         assert not g.isSeparator(v)
+    g.assertSimple()
     assert len(g.disjointPartitions()) == 4
     assert len(g.disjointPartitions(verts[1:])) == 4
     assert len(g.disjointPartitions(verts[2:])) == 3
