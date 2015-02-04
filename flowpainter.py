@@ -117,18 +117,18 @@ class FlowBoardPainter(QPainter):
         self.restore()
 
     def drawBridge(self, rect, style=None, alpha=None):
-        mindim = int(min(rect.width(), rect.height()))
-        gapw = int(mindim * (1 - self._flowwidth) / 2)
-        x1 = rect.left() + gapw - 1
-        y1 = rect.top() + gapw - 1
-        x2 = rect.right() - rect.width() + mindim - gapw + 1
-        y2 = rect.bottom() - rect.height() + mindim - gapw + 1
         c = self._gridcolor
         if alpha is not None:
             c = QColor(c)
             c.setAlphaF(alpha)
         brush = QBrush(c, style) if style else c
         self.setPen(QPen(brush, 2, cap=Qt.SquareCap, join=Qt.MiterJoin))
+        mindim = int(min(rect.width(), rect.height()))
+        gapw = int(mindim * (1 - self._flowwidth) / 2)
+        x1 = rect.left() + gapw - 1
+        y1 = rect.top() + gapw - 1
+        x2 = rect.right() - rect.width() + mindim - gapw + 1
+        y2 = rect.bottom() - rect.height() + mindim - gapw + 1
         path = QPainterPath()
         for xx, yy in product([(rect.left(), x1), (rect.right(), x2)],
                               [(rect.top(), y1), (rect.bottom(), y2)]):
