@@ -75,6 +75,9 @@ class FlowBoardEditor(QWidget):
             cell = self._lastMoveCell
             if self.selectedTool.canApply(self._board, cell):
                 self._drawToolPreview(ptr, self.selectedTool, cell)
+            else:
+                for c in self.selectedTool.conflictCells(self._board, cell):
+                    ptr.drawConflict(self._grid.cellRect(c))
 
     def mousePressEvent(self, event):
         cell = self._grid.findCell(event.pos())
@@ -160,6 +163,7 @@ class FlowBoardEditor(QWidget):
     def _toolChanged(self):
         self.repaint()
 
+
 ############################ cell tools
 
 
@@ -180,6 +184,9 @@ class FlowTool(QObject):
         return self._continuous
 
     def canApply(self, board, cell):
+        raise NotImplementedError()
+
+    def conflictCells(self, board, cell):
         raise NotImplementedError()
 
     def applyAction(self, board, cell):
@@ -206,6 +213,9 @@ class FlowToolClear(FlowTool):
     def canApply(self, board, cell):
         return not board.isClear(cell)
 
+    def conflictCells(self, board, cell):
+        return []
+
     def applyAction(self, board, cell):
         board.clear(cell)
 
@@ -229,6 +239,9 @@ class FlowToolEndpoint(FlowTool):
     def canApply(self, board, cell):
         return board.endpointKeyAt(cell) != self._key
 
+    def conflictCells(self, board, cell):
+        return []
+
     def applyAction(self, board, cell):
         board.setEndpoint(cell, self.endpointKey)
 
@@ -246,6 +259,10 @@ class FlowToolBridge(FlowTool):
 
     def canApply(self, board, cell):
         return not board.hasBridgeAt(cell) and board.bridgeValidAt(cell)
+
+    def conflictCells(self, board, cell):
+        if not board.hasBridgeAt(cell) and not board.bridgeValidAt(cell):
+            yield cell
 
     def applyAction(self, board, cell):
         board.setBridge(cell)
@@ -266,6 +283,10 @@ class FlowToolBlock(FlowTool):
 
     def canApply(self, board, cell):
         return not board.hasBlockageAt(cell) and board.blockageValidAt(cell)
+
+    def conflictCells(self, board, cell):
+        if not board.hasBlockageAt(cell) and not board.blockageValidAt(cell):
+            yield cell
 
     def applyAction(self, board, cell):
         board.setBlockage(cell)

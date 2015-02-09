@@ -141,6 +141,9 @@ class FlowBoardPainter(QPainter):
             path.lineTo(xx[1], yy[0])
         self.drawPath(path)
 
+    def drawConflict(self, rect):
+        self.fillRect(rect, QBrush(QColor(200, 0, 0), style=Qt.BDiagPattern))
+
     def clearBlock(self, rect, style=None, alpha=None):
         brush = _styleAlphaBrush(QFlowPalette[0][1], style, alpha)
         self.fillRect(rect, brush)
