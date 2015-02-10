@@ -124,6 +124,20 @@ class FlowBoardPainter(QPainter):
         self.drawEllipse(rect)
         self.restore()
 
+    def drawEndpointFade(self, rect, scale=None):
+        rect = FlowBoardPainter._endpointRect(rect, scale)
+        gradient = QRadialGradient(QRectF(rect).center(), rect.width() / 2)
+        bg = QColor(QFlowPalette[0][1])
+        bg.setAlphaF(0.2)
+        gradient.setColorAt(0.6, bg)
+        gradient.setColorAt(1.0, QFlowPalette[0][1])
+        self.save()
+        self.setRenderHint(QPainter.Antialiasing, True)
+        self.setBrush(QBrush(gradient))
+        self.setPen(QPen(QFlowPalette[0][1], 1))
+        self.drawEllipse(rect)
+        self.restore()
+
     def drawBridge(self, rect, style=None, alpha=None):
         brush = _styleAlphaBrush(QFlowPalette[0][0], style, alpha)
         self.setPen(QPen(brush, 2, cap=Qt.SquareCap, join=Qt.MiterJoin))

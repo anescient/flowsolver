@@ -100,18 +100,20 @@ class FlowBoardEditor(QWidget):
 
     def _drawToolPreview(self, ptr, tool, cell):
         rect = self._grid.cellRect(cell)
+        ptr.clearBlock(rect, alpha=0.5)
         if isinstance(tool, FlowToolEndpoint):
-            if self._board.endpointKeyAt(cell) is None:
-                ptr.clearBlock(rect, alpha=0.5)
             ptr.drawEndpointGlow(rect, key=tool.endpointKey)
+            repl = tool.nextReplaced(self._board, cell)
+            if repl:
+                ptr.drawEndpointFade(self._grid.cellRect(repl))
         elif isinstance(tool, FlowToolBlock):
-            ptr.clearBlock(rect, alpha=0.5)
             ptr.drawBlock(rect, alpha=0.5)
-        elif isinstance(tool, FlowToolClear):
-            ptr.clearBlock(rect, alpha=0.5)
         elif isinstance(tool, FlowToolBridge):
-            ptr.clearBlock(rect, alpha=0.5)
             ptr.drawBridge(rect, alpha=0.7)
+        elif isinstance(tool, FlowToolClear):
+            pass
+        else:
+            raise Exception("unhandled tool")
 
     def _cellClicked(self, cell, button):
         if button == Qt.LeftButton:
@@ -187,6 +189,10 @@ class FlowTool(QObject):
         raise NotImplementedError()
 
     def conflictCells(self, board, cell):
+        """
+            For applying to a given cell,
+            return sequence of cells which indicate error/forbidden.
+        """
         raise NotImplementedError()
 
     def applyAction(self, board, cell):
@@ -238,6 +244,10 @@ class FlowToolEndpoint(FlowTool):
 
     def canApply(self, board, cell):
         return board.endpointKeyAt(cell) != self._key
+
+    def nextReplaced(self, board, cell):
+        return board.nextEndpointDrop(self.endpointKey) \
+            if self.canApply(board, cell) else None
 
     def conflictCells(self, board, cell):
         return []

@@ -54,6 +54,11 @@ class FlowBoard(object):
     def hasCompleteEndpoints(self, key):
         return key in self._endpoints and len(self._endpoints[key]) == 2
 
+    def nextEndpointDrop(self, key):
+        if key in self._endpoints and len(self._endpoints[key]) == 2:
+            return self._endpoints[key][0]
+        return None
+
     def setEndpoint(self, cell, key):
         self.clear(cell)
         l = self._endpoints[key] if key in self._endpoints else []
