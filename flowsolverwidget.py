@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
+from os import path
 from datetime import datetime, timedelta
 from PyQt4.QtCore import QCoreApplication, QSize, pyqtSignal
-from PyQt4.QtGui import QWidget
+from PyQt4.QtGui import QWidget, QImageWriter
 from flowpainter import SpacedGrid, FlowBoardPainter
-from flowsolver import FlowBoardSolver
+from flowboard import FlowBoardSolver
 
 
 class FlowSolverWidget(QWidget):
@@ -68,13 +69,21 @@ class FlowSolverWidget(QWidget):
         ptr = FlowBoardPainter(self)
         ptr.fillBackground()
         if self._board:
+            if self._solver and self._solver.solved:
+                ptr.drawFlowHighlights(self._grid, self._solver)
             ptr.drawGrid(self._grid)
             ptr.drawBoardFeatures(self._grid, self._board)
             if self._solver:
-                for key, cells in self._solver.getFlows():
-                    if len(cells) > 1:
-                        ptr.drawFlow(self._grid, key, cells)
+                ptr.drawFlows(self._grid, self._solver)
         ptr.end()
 
     def sizeHint(self):
         return QSize(self._size, self._size)
+
+    def saveImage(self, dirpath):
+        img = FlowBoardPainter.renderImage(self._board, self._solver)
+        filename = hex(abs(self._solver.stateHash()))[2:] + '.png'
+        writer = QImageWriter(path.join(dirpath, filename))
+        writer.setFormat('png')
+        if not writer.write(img):
+            raise Exception(writer.errorString())

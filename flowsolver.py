@@ -2,17 +2,64 @@
 
 from collections import deque
 from itertools import islice, chain, izip, product
-from flowboard import FlowBoardGraph
 from graph import OnlineReducedGraph
 
 
-class FlowGraphSolver(object):
+# A Flow puzzle consists of:
+#   * a simple graph
+#   * one or more distinct pairs of vertices in the graph ("endpoints")
+#   * zero or more sets of vertices in the graph ("exclusive sets")
+# A solution to a puzzle consists of a collection of simple paths
+# corresponding to the collection of endpoint pairs.
+# The path for each pair ends on the vertices in the pair.
+# All paths are vertex-disjoint and their union spans the graph,
+# in other words, every vertex in the graph appears in exactly one path.
+# Each path may include at most one vertex from each exclusive set.
+class FlowPuzzle(object):
+    def __init__(self, graph, endpointPairs, exclusiveSets):
+        self._graph = graph
+        self._endpointPairs = endpointPairs
+        self._exclusiveSets = exclusiveSets
+        self._exclusionMap = {}
+        for es in self._exclusiveSets:
+            assert len(es) > 1
+            for v in es:
+                if v not in self._exclusionMap:
+                    self._exclusionMap[v] = set()
+                self._exclusionMap[v] |= es
+        for v, es in self._exclusionMap.iteritems():
+            es.remove(v)
+
+    @property
+    def graph(self):
+        return self._graph
+
+    @property
+    def endpointPairs(self):
+        """2-tuples of vertices to be connected."""
+        return iter(self._endpointPairs)
+
+    @property
+    def exclusiveSets(self):
+        """Sets of vertices. A path may include at most one from each set."""
+        return iter(self._exclusiveSets)
+
+    def exclusions(self, v):
+        """
+            For vertex v, return the vertices which cannot be included
+            in a path which includes v.
+        """
+        return self._exclusionMap.get(v, None)
+
+
+class FlowSolver(object):
 
     class _Frame(object):
 
-        def __init__(self, graph, reducedgraph, \
+        def __init__(self, puzzle, reducedgraph, \
                            headpairs, commoncomponents, blocks):
-            self._graph = graph
+            self._puzzle = puzzle
+            self._graph = self._puzzle.graph
             self._reducedgraph = reducedgraph
             self._headpairs = headpairs
             self._commoncomponents = commoncomponents
@@ -60,7 +107,7 @@ class FlowGraphSolver(object):
             return self._reducedgraph.allMasked and not self._headpairs
 
         def copy(self, move=None):
-            frame = self.__class__(self._graph, self._reducedgraph, \
+            frame = self.__class__(self._puzzle, self._reducedgraph, \
                                    self._headpairs, self._commoncomponents, \
                                    self._blocks)
             if move:
@@ -83,10 +130,10 @@ class FlowGraphSolver(object):
             else:
                 self._headpairs[pairidx] = \
                     (to, other) if to < other else (other, to)
-                if to in self._graph.bridgeGroups:
+                if self._puzzle.exclusions(to):
                     self._blocks = list(self._blocks)
-                    self._blocks[pairidx] = self._blocks[pairidx].copy()
-                    self._blocks[pairidx].add(self._graph.bridgeGroups[to])
+                    self._blocks[pairidx] = \
+                        self._blocks[pairidx] | self._puzzle.exclusions(to)
                 self._reducedgraph = self._reducedgraph.copy()
                 self._closeVertex(to)
 
@@ -233,9 +280,9 @@ class FlowGraphSolver(object):
             if len(movesets) == 1:
                 vidx, moves = movesets[0]
                 return ((vidx, to) for to in moves)
-            leafmoves = self._leafMoves(movesets)
-            if leafmoves:
-                return leafmoves
+            leafmove = self._leafMove(movesets)
+            if leafmove:
+                return [leafmove]
 
             # not sure why this helps as much as it does
             # maybe by increasing chance of memo hit?
@@ -282,31 +329,26 @@ class FlowGraphSolver(object):
                 movesets.append(ms2)
             return movesets
 
-        def _leafMoves(self, movesets):
-            """return list of (vidx, move) or None"""
-            # if any open vertex has 0 or 1 adjacent open vertices,
-            # it must be used by some adjacent path head
+        def _leafMove(self, movesets):
+            """return (vidx, move) or None"""
+            # Look for a move to an open vertex which is adjacent only to
+            # one other open vertex and one path head.
+            # If such a move exists now, it must eventually be taken.
             allmoves = reduce(set.union, (moves for _, moves in movesets))
-            leaf = None
+            leafs = []
             for m in allmoves.intersection(self._reducedgraph.vertices):
-                if len(self._reducedgraph.adjacencies(m)) < 2:
-                    leaf = m
-                    break
-            if leaf is None:
-                return None
-            leafmoves = []
-            for vidx, moves in movesets:
-                if leaf in moves:
-                    leafmoves.append((vidx, leaf))
-            return leafmoves
+                if len(self._reducedgraph.adjacencies(m)) == 1:
+                    leafs.append(m)
+            for leaf in leafs:
+                vidxs = [vidx for vidx, moves in movesets if leaf in moves]
+                if len(vidxs) == 1:
+                    return (vidxs[0], leaf)
+            return None
 
         @classmethod
-        def initial(cls, graph, endpointpairs):
-            assert all(len(vp) == 2 for vp in endpointpairs)
-            assert len(reduce(set.union, map(set, endpointpairs), set())) == \
-                   2 * len(endpointpairs)
-            headpairs = [tuple(sorted(ep)) for ep in endpointpairs]
-            reducedgraph = OnlineReducedGraph(graph)
+        def initial(cls, puzzle):
+            headpairs = [tuple(sorted(ep)) for ep in puzzle.endpointPairs]
+            reducedgraph = OnlineReducedGraph(puzzle.graph)
             for v in chain(*headpairs):
                 reducedgraph.maskVertex(v)
             commoncomponents = []
@@ -314,7 +356,7 @@ class FlowGraphSolver(object):
                 commoncomponents.append(reducedgraph.adjacentComponents(v1) & \
                                         reducedgraph.adjacentComponents(v2))
             blocks = [set()] * len(headpairs)
-            return cls(graph, reducedgraph, \
+            return cls(puzzle, reducedgraph, \
                        headpairs, commoncomponents, blocks)
 
         @staticmethod
@@ -371,13 +413,12 @@ class FlowGraphSolver(object):
                 sorted(self._memo, key=self._memo.get, reverse=True), limit)
             self._memo = dict((k, self._memo[k]) for k in keep)
 
-    def __init__(self, graph, endpointpairs):
-        self._stack = [self._Frame.initial(graph, endpointpairs)]
+    def __init__(self, puzzle):
+        self._stack = [self._Frame.initial(puzzle)]
         if self._stack[-1].simpleUnsolvable():
             self._stack = []
         self._totalframes = 1
         self._memo = self._Memo()
-        self._solutions = set()
 
     @property
     def done(self):
@@ -386,6 +427,9 @@ class FlowGraphSolver(object):
     @property
     def solved(self):
         return bool(self._stack and self._stack[-1].isSolved())
+
+    def stateHash(self):
+        return hash(self._immutableFlows())
 
     def step(self):
         if not self._stack:
@@ -422,12 +466,7 @@ class FlowGraphSolver(object):
             while self.step():
                 step = True
             if self._stack[-1].isSolved():
-                solution = self._immutableFlows()
-                if solution in self._solutions:
-                    self.skipSolution()
-                else:
-                    self._solutions.add(solution)
-                    return True
+                return True
             if step and limit is not None:
                 limit -= 1
                 if limit <= 0:
@@ -438,14 +477,15 @@ class FlowGraphSolver(object):
 
     def skipSolution(self):
         assert self.solved
+        while self.stepBack():
+            pass
         self._memo = self._Memo()
-        self._stack.pop()
 
     def printStats(self):
         print "{0} visited".format(self._totalframes)
         print "memo: " + self._memo.stats()
         if self.solved:
-            print "solution", hex(abs(hash(self._immutableFlows())))
+            print "solution", hex(abs(self.stateHash()))
 
     def getFlows(self):
         return self._Frame.recoverPaths(self._stack)
@@ -459,25 +499,3 @@ class FlowGraphSolver(object):
         return frozenset(flows)
 
     __getFlows = getFlows
-
-
-class FlowBoardSolver(FlowGraphSolver):
-    def __init__(self, board):
-        assert board.isValid()
-        self._boardgraph = FlowBoardGraph(board)
-
-        self._vertexKey = {}
-        endpointpairs = []
-        for k, (xy1, xy2) in board.endpointPairs:
-            v1 = self._boardgraph.cellToVertex(xy1)
-            v2 = self._boardgraph.cellToVertex(xy2)
-            self._vertexKey[v1] = k
-            self._vertexKey[v2] = k
-            endpointpairs.append((v1, v2))
-
-        super(FlowBoardSolver, self).__init__(self._boardgraph, endpointpairs)
-
-    def getFlows(self):
-        for vflow in super(FlowBoardSolver, self).getFlows():
-            yield (self._vertexKey[vflow[0]], \
-                   self._boardgraph.verticesToCells(vflow))

@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
-from itertools import combinations
-from graph import QueryableSimpleGraph
 from gridgraph import GraphOntoRectangularGrid
+from flowsolver import FlowPuzzle, FlowSolver
 
 
 class FlowBoard(object):
@@ -36,6 +35,9 @@ class FlowBoard(object):
     def blockages(self):
         return iter(self._blockages)
 
+    def isEmpty(self):
+        return not (self._endpoints or self._bridges or self._blockages)
+
     def isValid(self):
         if not self._endpoints:
             return False
@@ -51,6 +53,11 @@ class FlowBoard(object):
 
     def hasCompleteEndpoints(self, key):
         return key in self._endpoints and len(self._endpoints[key]) == 2
+
+    def nextEndpointDrop(self, key):
+        if key in self._endpoints and len(self._endpoints[key]) == 2:
+            return self._endpoints[key][0]
+        return None
 
     def setEndpoint(self, cell, key):
         self.clear(cell)
@@ -89,6 +96,11 @@ class FlowBoard(object):
     def hasBlockageAt(self, cell):
         return cell in self._blockages
 
+    def isClear(self, cell):
+        if cell in self._bridges or cell in self._blockages:
+            return False
+        return not any(cell in cells for cells in self._endpoints.values())
+
     def clear(self, cell):
         assert self._includesCell(cell)
         for k, l in self._endpoints.iteritems():
@@ -100,9 +112,42 @@ class FlowBoard(object):
         self._bridges.discard(cell)
         self._blockages.discard(cell)
 
+    def getPuzzle(self):
+        """
+            Return (FlowPuzzle, dict)
+            The dictionary is a mapping of vertex to cell coordinates.
+        """
+        gridgraph = GraphOntoRectangularGrid(self.size)
+
+        endpointPairs = []
+        for _, xypair in self.endpointPairs:
+            vpair = tuple(map(gridgraph.singleVertexAt, xypair))
+            endpointPairs.append(vpair)
+
+        for xy in self.blockages:
+            gridgraph.removeVertexAt(xy)
+
+        exclusiveSets = []
+        for xy in self.bridges:
+            x_adj, y_adj = gridgraph.orthogonalAdjacencies(xy)
+            assert len(x_adj) == 2 and len(y_adj) == 2
+            gridgraph.removeVertexAt(xy)
+
+            xpass = gridgraph.pushVertex(xy)
+            gridgraph.addEdge(x_adj.pop(), xpass)
+            gridgraph.addEdge(x_adj.pop(), xpass)
+
+            ypass = gridgraph.pushVertex(xy)
+            gridgraph.addEdge(y_adj.pop(), ypass)
+            gridgraph.addEdge(y_adj.pop(), ypass)
+
+            exclusiveSets.append(set([xpass, ypass]))
+
+        return (FlowPuzzle(gridgraph.graph, endpointPairs, exclusiveSets),
+                gridgraph.getLocationMap())
+
     def _includesCell(self, cell):
-        return cell[0] >= 0 and cell[0] < self._size and \
-               cell[1] >= 0 and cell[1] < self._size
+        return 0 <= cell[0] < self.size and 0 <= cell[1] < self.size
 
     def _adjacentUnblockedCells(self, cell):
         return set(self._adjacentCells(cell)) - self._blockages
@@ -117,54 +162,20 @@ class FlowBoard(object):
         if cell[1] < self._size - 1:
             yield (cell[0], cell[1] + 1)
 
-    @staticmethod
-    def _adjacent(cell1, cell2):
-        return (abs(cell1[0] - cell2[0]) == 1) != \
-               (abs(cell1[1] - cell2[1]) == 1)
 
-
-class FlowBoardGraph(QueryableSimpleGraph):
+class FlowBoardSolver(FlowSolver):
     def __init__(self, board):
-        gridgraph = GraphOntoRectangularGrid(board.size)
+        assert board.isValid()
+        puzzle, self._cellmap = board.getPuzzle()
+        super(FlowBoardSolver, self).__init__(puzzle)
 
-        for xy in board.blockages:
-            gridgraph.removeVertexAt(xy)
+        self._vertexKey = {}
+        for v1, v2 in puzzle.endpointPairs:
+            k = board.endpointKeyAt(self._cellmap[v1])
+            assert board.endpointKeyAt(self._cellmap[v2]) == k
+            self._vertexKey[v1] = k
+            self._vertexKey[v2] = k
 
-        self._bridgegroups = {}
-        for xy in board.bridges:
-            x_adj, y_adj = gridgraph.orthogonalAdjacencies(xy)
-            assert len(x_adj) == 2 and len(y_adj) == 2
-            gridgraph.removeVertexAt(xy)
-
-            xpass = gridgraph.pushVertex(xy)
-            gridgraph.addEdge(x_adj.pop(), xpass)
-            gridgraph.addEdge(x_adj.pop(), xpass)
-
-            ypass = gridgraph.pushVertex(xy)
-            gridgraph.addEdge(y_adj.pop(), ypass)
-            gridgraph.addEdge(y_adj.pop(), ypass)
-
-            self._bridgegroups[xpass] = ypass
-            self._bridgegroups[ypass] = xpass
-
-        for (xy1, k1), (xy2, k2) in combinations(board.endpoints, 2):
-            if k1 != k2 and gridgraph.singlesAdjacent(xy1, xy2):
-                gridgraph.removeUniqueEdge(xy1, xy2)
-
-        self._cellToVertex = gridgraph.singleVertexAt
-        self._vertexToCell = gridgraph.locationForVertex
-        super(FlowBoardGraph, self).__init__(gridgraph.graph.copyEdgeSets())
-
-    @property
-    def bridgeGroups(self):
-        """dictionary of a: b, where b is forbidden to paths including a"""
-        return self._bridgegroups
-
-    def cellToVertex(self, cell):
-        return self._cellToVertex(cell)
-
-    def vertexToCell(self, v):
-        return self._vertexToCell(v)
-
-    def verticesToCells(self, vseq):
-        return list(map(self._vertexToCell, vseq))
+    def getFlows(self):
+        for vflow in super(FlowBoardSolver, self).getFlows():
+            yield (self._vertexKey[vflow[0]], map(self._cellmap.get, vflow))

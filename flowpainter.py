@@ -1,51 +1,66 @@
 #!/usr/bin/env python
 
-from PyQt4.QtCore import Qt, QPoint, QLine, QSize, QRect
-from PyQt4.QtGui import QPainter, QColor, QPen
+from itertools import product
+from PyQt4.QtCore import Qt, QPoint, QLine, QSize, QRect, QRectF
+from PyQt4.QtGui import QPainter, QColor, QBrush, QPen, QImage, \
+    QRadialGradient, QPainterPath
 
 
-FlowPalette = {
-    1: QColor(255, 0, 0),  # red
-    2: QColor(0, 128, 0),  # green
-    3: QColor(0, 0, 255),  # blue
-    4: QColor(255, 255, 0),  # yellow
-    5: QColor(255, 128, 0),  # orange
-    6: QColor(0, 255, 255),  # turquoise
-    7: QColor(255, 0, 255),  # violet
-    8: QColor(165, 44, 41),  # dark red
-    9: QColor(128, 0, 128),  # dark violet
-    10: QColor(255, 255, 255),  # white
-    11: QColor(165, 165, 165),  # grey
-    12: QColor(0, 255, 0),  # bright green
-    13: QColor(189, 182, 107),  # beige
-    14: QColor(0, 0, 140),  # dark blue
-    15: QColor(0, 130, 132),  # dark turquoise
-    16: QColor(235, 77, 139)}  # pink
+# values ((r, g, b), (r, g, b))
+# The first color is used to render endpoints and paths.
+# The second color is the corresponding background/highlight.
+# The game allocates these colors to endpoint pairs in this order.
+FlowPalette = [
+    ((100, 100, 55), (0, 0, 0)),  # grid and normal background
+    ((255, 0, 0), (114, 57, 57)),  # red
+    ((0, 128, 0), (57, 85, 57)),  # green
+    ((0, 0, 255), (57, 57, 114)),  # blue
+    ((238, 238, 0), (110, 110, 57)),  # yellow
+    ((255, 127, 0), (114, 85, 57)),  # orange
+    ((0, 255, 255), (57, 114, 114)),  # turquoise
+    ((255, 0, 255), (114, 57, 114)),  # violet
+    ((165, 42, 42), (95, 66, 66)),  # dark red
+    ((128, 0, 128), (85, 57, 85)),  # dark violet
+    ((255, 255, 255), (114, 114, 114)),  # white
+    ((166, 166, 166), (95, 95, 95)),  # grey
+    ((0, 255, 0), (57, 114, 57)),  # bright green
+    ((189, 183, 107), (100, 98, 81)),  # beige
+    ((0, 0, 139), (63, 57, 88)),  # dark blue
+    ((0, 128, 128), (57, 85, 85)),  # dark turquoise
+    ((255, 20, 147), (114, 61, 90))]  # pink
+
+QFlowPalette = [tuple(QColor(*rgb) for rgb in entry) for entry in FlowPalette]
+
+
+def _styleAlphaBrush(color, style=None, alpha=None):
+    if alpha is not None:
+        color = QColor(color)
+        color.setAlphaF(alpha)
+    return QBrush(color, style) if style else color
 
 
 class FlowBoardPainter(QPainter):
 
-    _bgcolor = QColor(0, 0, 0)
-    _gridcolor = QColor(81, 80, 62)
-    _highlightcolor = QColor(34, 51, 44)
-    _flowwidth = 0.3
+    _flowwidth = 0.33
 
     def __init__(self, target):
         self._target = target
         super(FlowBoardPainter, self).__init__(target)
 
     def fillBackground(self):
+        fillcolor = QFlowPalette[0][1]
         cm = self.compositionMode()
         self.setCompositionMode(QPainter.CompositionMode_Clear)
-        self.fillRect(self._target.rect(), self._bgcolor)
+        self.fillRect(self._target.rect(), fillcolor)
         self.setCompositionMode(cm)
+        self.fillRect(self._target.rect(), fillcolor)
 
     def traceBound(self, rect):
-        self.setPen(QPen(self._gridcolor, 2, join=Qt.MiterJoin))
+        self.setPen(QPen(QFlowPalette[0][0], 2, join=Qt.MiterJoin))
         self.drawRect(rect.adjusted(1, 1, -1, -1))
 
     def drawGrid(self, grid):
-        self.setPen(QPen(self._gridcolor, grid.spacing))
+        self.setPen(QPen(QFlowPalette[0][0], grid.spacing))
         for x in grid.columnSpacingsCenters():
             self.drawLine(x, 0, x, grid.size.width())
         for y in grid.rowSpacingsCenters():
@@ -54,62 +69,145 @@ class FlowBoardPainter(QPainter):
     def drawBoardFeatures(self, grid, board):
         for cell, key in board.endpoints:
             rect = grid.cellRect(cell)
-            margin = rect.width() // 8
-            rect = rect.adjusted(margin, margin, -margin, -margin)
             self.drawEndpoint(rect, key)
         for cell in board.bridges:
-            self.drawBridge(grid.cellRect(cell))
+            rect = grid.cellRect(cell)
+            self.drawBridge(rect)
         for cell in board.blockages:
-            self.drawBlock(grid.cellRect(cell))
+            rect = grid.cellRect(cell)
+            self.drawBlock(rect)
 
-    def drawCellHighlight(self, grid, cell):
-        self.fillRect(grid.cellRect(cell), self._highlightcolor)
+    def drawFlowHighlights(self, grid, solver):
+        for key, cells in solver.getFlows():
+            c = QColor(QFlowPalette[key][1])
+            c.setAlphaF(0.8)
+            for cell in cells:
+                self.fillRect(grid.cellRect(cell), c)
 
-    def drawFlow(self, grid, key, cells):
+    def drawFlows(self, grid, solver):
+        for key, cells in solver.getFlows():
+            if len(cells) > 1:
+                self._drawFlow(grid, key, cells)
+
+    def _drawFlow(self, grid, key, cells):
         assert len(cells) > 1
         linew = int(grid.minDimension * self._flowwidth)
-        self.setPen(QPen(FlowPalette[key], linew, \
-            cap=Qt.RoundCap, join=Qt.RoundJoin))
+        self.setPen(QPen(QFlowPalette[key][0], linew,
+                    cap=Qt.RoundCap, join=Qt.RoundJoin))
         self.drawLines(list(FlowBoardPainter._flowLines(grid, cells)))
 
-    def drawEndpoint(self, rect, key=None, color=None):
+    def drawEndpoint(self, rect, key=None, color=None, style=None, scale=None):
         if key is not None:
-            color = FlowPalette[key]
+            color = QFlowPalette[key][0]
         else:
             assert isinstance(color, QColor)
+        rect = FlowBoardPainter._endpointRect(rect, scale)
         self.save()
         self.setRenderHint(QPainter.Antialiasing, True)
-        self.setBrush(color)
+        self.setBrush(_styleAlphaBrush(color, style, None))
         self.setPen(QPen(Qt.NoPen))
         self.drawEllipse(rect)
         self.restore()
 
-    def drawBridge(self, rect):
-        w = rect.width() * (1.0 - self._flowwidth) * 0.5
-        self._fillCorners(rect, w, self._gridcolor)
-        self._fillCorners(rect, w - 3, self._bgcolor)
+    def drawEndpointGlow(self, rect, key, scale=None):
+        color = QFlowPalette[key][0]
+        rect = FlowBoardPainter._endpointRect(rect, scale)
+        gradient = QRadialGradient(QRectF(rect).center(), rect.width() / 2)
+        bg = QColor(color)
+        bg.setAlphaF(0.3)
+        gradient.setColorAt(0.5, bg)
+        gradient.setColorAt(1.0, color)
+        self.save()
+        self.setRenderHint(QPainter.Antialiasing, True)
+        self.setBrush(QBrush(gradient))
+        self.setPen(QPen(color, 1))
+        self.drawEllipse(rect)
+        self.restore()
 
-    def drawBlock(self, rect):
-        self.fillRect(rect, self._gridcolor)
+    def drawEndpointFade(self, rect, scale=None):
+        rect = FlowBoardPainter._endpointRect(rect, scale)
+        gradient = QRadialGradient(QRectF(rect).center(), rect.width() / 2)
+        bg = QColor(QFlowPalette[0][1])
+        bg.setAlphaF(0.2)
+        gradient.setColorAt(0.6, bg)
+        gradient.setColorAt(1.0, QFlowPalette[0][1])
+        self.save()
+        self.setRenderHint(QPainter.Antialiasing, True)
+        self.setBrush(QBrush(gradient))
+        self.setPen(QPen(QFlowPalette[0][1], 1))
+        self.drawEllipse(rect)
+        self.restore()
 
-    def _fillCorners(self, rect, width, color):
-        corner = QRect(0, 0, width, width)
-        corner.moveTopLeft(rect.topLeft())
-        self.fillRect(corner, color)
-        corner.moveTopRight(rect.topRight())
-        self.fillRect(corner, color)
-        corner.moveBottomLeft(rect.bottomLeft())
-        self.fillRect(corner, color)
-        corner.moveBottomRight(rect.bottomRight())
-        self.fillRect(corner, color)
+    def drawBridge(self, rect, style=None, alpha=None):
+        brush = _styleAlphaBrush(QFlowPalette[0][0], style, alpha)
+        self.setPen(QPen(brush, 2, cap=Qt.SquareCap, join=Qt.MiterJoin))
+        mindim = int(min(rect.width(), rect.height()))
+        gapw = int(mindim * (1 - self._flowwidth) / 2)
+        x1 = rect.left() + gapw - 1
+        y1 = rect.top() + gapw - 1
+        x2 = rect.right() - rect.width() + mindim - gapw + 1
+        y2 = rect.bottom() - rect.height() + mindim - gapw + 1
+        path = QPainterPath()
+        for xx, yy in product([(rect.left(), x1), (rect.right(), x2)],
+                              [(rect.top(), y1), (rect.bottom(), y2)]):
+            path.moveTo(xx[0], yy[1])
+            path.lineTo(xx[1], yy[1])
+            path.lineTo(xx[1], yy[0])
+        self.drawPath(path)
+
+    def drawConflict(self, rect):
+        self.fillRect(rect, QBrush(QColor(200, 0, 0), style=Qt.BDiagPattern))
+
+    def clearBlock(self, rect, style=None, alpha=None):
+        brush = _styleAlphaBrush(QFlowPalette[0][1], style, alpha)
+        self.fillRect(rect, brush)
+
+    def drawBlock(self, rect, style=None, alpha=None):
+        brush = _styleAlphaBrush(QFlowPalette[0][0], style, alpha)
+        self.fillRect(rect, brush)
+
+    @staticmethod
+    def endpointKeys():
+        return range(1, len(FlowPalette))
+
+    @staticmethod
+    def renderImage(board, solver=None):
+        cellsize = 33
+        spacing = 1
+        imgsize = board.size * (cellsize + spacing) + spacing
+        imgsize = QSize(imgsize, imgsize)
+        img = QImage(imgsize, QImage.Format_ARGB32_Premultiplied)
+        grid = SpacedGrid(board.size, board.size, imgsize, spacing)
+        ptr = FlowBoardPainter(img)
+        ptr.fillBackground()
+        if solver and solver.solved:
+            ptr.drawFlowHighlights(grid, solver)
+        ptr.drawGrid(grid)
+        ptr.drawBoardFeatures(grid, board)
+        if solver:
+            ptr.drawFlows(grid, solver)
+        ptr.end()
+        return img.convertToFormat(QImage.Format_RGB32)
+
+    @staticmethod
+    def _endpointRect(rect, scale=None):
+        scale = scale or 0.75
+        dw = 0  # total width adjust
+        dh = 0  # total height adjust
+        if rect.width() > rect.height():
+            dw -= (rect.width() - rect.height())
+        elif rect.height() > rect.width():
+            dh -= (rect.height() - rect.width())
+        dw -= (1.0 - scale) * (rect.width() + dw)
+        dh -= (1.0 - scale) * (rect.height() + dh)
+        return rect.adjusted(-dw / 2, -dh / 2, dw / 2, dh / 2)
 
     @staticmethod
     def _flowLines(grid, cells):
         assert len(cells) > 1
         cells = FlowBoardPainter._simplifyFlow(cells)
         for start, end in zip(cells, cells[1:]):
-            yield QLine(grid.cellCenter(start), \
-                        grid.cellCenter(end))
+            yield QLine(grid.cellCenter(start), grid.cellCenter(end))
 
     @staticmethod
     def _simplifyFlow(cells):
@@ -136,10 +234,10 @@ class SpacedGrid(object):
         self._size = size
         assert spacing == int(spacing)
         self._spacing = int(spacing)
-        self._rows = list(SpacedGrid._divideRange(\
-            0, size.height(), rows, spacing))
-        self._columns = list(SpacedGrid._divideRange(\
-            0, size.width(), columns, spacing))
+        self._rows = \
+            list(SpacedGrid._divideRange(0, size.height(), rows, spacing))
+        self._columns = \
+            list(SpacedGrid._divideRange(0, size.width(), columns, spacing))
         self._minheight = min(r[1] - r[0] for r in self._rows)
         self._minwidth = min(c[1] - c[0] for c in self._columns)
 
@@ -212,5 +310,5 @@ class SpacedGrid(object):
         """
         lastmax = (end - start) - spacing
         for i in xrange(divisions):
-            yield (spacing + i * lastmax / divisions, \
+            yield (spacing + i * lastmax / divisions,
                    (i + 1) * lastmax / divisions - 1)

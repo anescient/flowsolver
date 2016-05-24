@@ -5,6 +5,7 @@ from PyQt4.QtGui import QApplication, QMainWindow, QColor, QPushButton, \
     QDialog, QStatusBar, QLayout, QBoxLayout, QLabel, QFileDialog, QMenuBar, \
     QWidget
 from QSquareWidget import QSquareWidgetContainer
+from flowboard import FlowBoard
 from flowboardeditor import FlowBoardEditor
 from flowsolverwidget import FlowSolverWidget
 
@@ -82,9 +83,9 @@ class FlowSolverAppWindow(QMainWindow):
         if filepath:
             self._editor.saveBoardFile(filepath)
 
-    @pyqtSlot(bool)
-    def _boardChanged(self, valid):
-        self._solveButton.setEnabled(valid)
+    @pyqtSlot(FlowBoard)
+    def _boardChanged(self, board):
+        self._solveButton.setEnabled(board.isValid())
 
 
 class FlowSolvingPopup(QDialog):
