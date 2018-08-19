@@ -447,7 +447,7 @@ class FlowBoardEditorToolBar(QToolBar):
         boardbox.setSpacing(2)
 
         self._sizelist = QComboBox()
-        for s in xrange(5, 15):
+        for s in xrange(5, 16):
             self._sizelist.addItem("{0}x{0}".format(s), s)
         self._sizelist.setCurrentIndex(2)
         boardbox.addWidget(self._sizelist)
