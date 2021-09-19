@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-from PyQt4.QtCore import QPoint, QSize, QRect
-from PyQt4.QtGui import QLayout, QLayoutItem, QWidgetItem, QWidget, QPainter
+from PyQt5.QtCore import QPoint, QSize, QRect
+from PyQt5.QtGui import QPainter
+from PyQt5.QtWidgets import QLayout, QLayoutItem, QWidgetItem, QWidget
 
 
 class QCenteredSquareItemLayout(QLayout):
@@ -25,6 +26,9 @@ class QCenteredSquareItemLayout(QLayout):
 
     def count(self):
         return 1 if self._item else 0
+
+    def margin(self):
+        return self.getContentsMargins()[1]  # top margin
 
     def setGeometry(self, rect):
         if rect == self._lastSetGeom:
@@ -71,7 +75,8 @@ class QSquareWidgetContainer(QWidget):
     def setWidget(self, widget):
         assert isinstance(widget, QWidget)
         self._layout = QCenteredSquareItemLayout()
-        self._layout.setMargin(self._margin)
+        m = self._margin
+        self._layout.setContentsMargins(m, m, m, m)
         self._layout.addWidget(widget)
         self.setLayout(self._layout)
 

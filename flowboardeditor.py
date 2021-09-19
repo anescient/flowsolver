@@ -2,10 +2,10 @@
 
 import pickle
 from copy import deepcopy
-from PyQt4.QtCore import Qt, QSize, QObject, pyqtSignal, pyqtSlot
-from PyQt4.QtGui import QWidget, QToolBar, QComboBox, QButtonGroup, \
-    QPushButton, QCheckBox, QGridLayout, QBoxLayout, QSizePolicy, \
-    QColor, QPen, QImage
+from PyQt5.QtCore import Qt, QSize, QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QColor, QPen, QImage
+from PyQt5.QtWidgets import QWidget, QToolBar, QComboBox, QButtonGroup, \
+    QPushButton, QCheckBox, QGridLayout, QBoxLayout, QSizePolicy
 from flowboard import FlowBoard
 from flowpainter import SpacedGrid, FlowBoardPainter
 
@@ -96,7 +96,8 @@ class FlowBoardEditor(QWidget):
             self.repaint()
 
     def wheelEvent(self, event):
-        self.toolbar.tools.stepEndpointSelection(event.delta() < 0)
+        delta = event.angleDelta().y()
+        self.toolbar.tools.stepEndpointSelection(delta < 0)
 
     def _drawToolPreview(self, ptr, tool, cell):
         rect = self._grid.cellRect(cell)
@@ -356,11 +357,11 @@ class FlowToolChooser(QWidget):
         self._group.setExclusive(True)
         layout = QGridLayout()
         layout.setSpacing(0)
-        layout.setMargin(0)
         layout.setContentsMargins(8, 3, 8, 3)
         layout.setAlignment(Qt.AlignCenter)
 
         endpointTools = map(FlowToolEndpoint, FlowBoardPainter.endpointKeys())
+        endpointToolCount = len(FlowBoardPainter.endpointKeys())
         self._endpointButtons = []
         row = 0
         col = 2
@@ -370,7 +371,7 @@ class FlowToolChooser(QWidget):
             self._group.addButton(toolButton)
             layout.addWidget(toolButton, row, col)
             col += 1
-            if col - 1 > len(endpointTools) / 2:
+            if col - 1 > endpointToolCount / 2:
                 row += 1
                 col = 2
 
@@ -447,7 +448,7 @@ class FlowBoardEditorToolBar(QToolBar):
         boardbox.setSpacing(2)
 
         self._sizelist = QComboBox()
-        for s in xrange(5, 16):
+        for s in range(5, 16):
             self._sizelist.addItem("{0}x{0}".format(s), s)
         self._sizelist.setCurrentIndex(2)
         boardbox.addWidget(self._sizelist)
@@ -467,8 +468,7 @@ class FlowBoardEditorToolBar(QToolBar):
 
     @property
     def selectedSize(self):
-        qv = self._sizelist.itemData(self._sizelist.currentIndex())
-        return qv.toInt()[0]
+        return self._sizelist.currentData()
 
     @property
     def selectedEndpointKey(self):

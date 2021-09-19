@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 from collections import deque
-from itertools import izip, count
+from itertools import count
+from functools import reduce
 
 
 class QueryableSimpleGraph(object):
@@ -12,7 +13,7 @@ class QueryableSimpleGraph(object):
 
     def assertSimple(self):
         """Test edge sets for correct simple graph properties."""
-        for v, adj in self._edges.iteritems():
+        for v, adj in self._edges.items():
             assert v not in adj
             for u in adj:
                 assert u in self._edges
@@ -23,7 +24,7 @@ class QueryableSimpleGraph(object):
         return iter(self._edges)
 
     def copyEdgeSets(self):
-        return dict((v, adj.copy()) for v, adj in self._edges.iteritems())
+        return dict((v, adj.copy()) for v, adj in self._edges.items())
 
     def adjacent(self, v1, v2):
         """Return True iff v1 and v2 share an edge."""
@@ -40,7 +41,7 @@ class QueryableSimpleGraph(object):
             return self._edges[v].intersection(mask)
 
     def paths(self):
-        innervs = set(v for v, e in self._edges.iteritems() if len(e) == 2)
+        innervs = set(v for v, e in self._edges.items() if len(e) == 2)
         paths = []
         while innervs:
             v = innervs.pop()
@@ -394,7 +395,7 @@ class OnlineReducedGraph(object):
             av = bf.pushVertex()
             articulations.add(av)
             vertexmap[sv] = av
-        for bc_k, bc in self._biconComponents.iteritems():
+        for bc_k, bc in self._biconComponents.items():
             seps = self._separatorMap[bc_k]
             if len(bc) == 2 and len(seps) == 2:
                 it = iter(bc)
@@ -496,7 +497,7 @@ class OnlineReducedGraph(object):
                         ks.remove(bc_k)
                         self._biconComponentMap[bcv] = ks
                     oldseps = self._separatorMap.pop(bc_k)
-                    for newbc_k, newbc in izip(self._keys, bcs):
+                    for newbc_k, newbc in zip(self._keys, bcs):
                         self._biconComponents[newbc_k] = newbc
                         self._separatorMap[newbc_k] = newbc & (oldseps | seps)
                         for bcv in newbc:
@@ -541,10 +542,10 @@ class OnlineReducedGraph(object):
 
     def adjacentComponents(self, v):
         adj = self._graph.adjacencies(v, self._vertices)
-        return set(c_k for c_k, c in self._components.iteritems() if adj & c)
+        return set(c_k for c_k, c in self._components.items() if adj & c)
 
     def _findComponent(self, v):
-        for c_k, c in self._components.iteritems():
+        for c_k, c in self._components.items():
             if v in c:
                 return c_k
         raise KeyError()
@@ -561,15 +562,15 @@ class OnlineReducedGraph(object):
 
         self._vertices = set(self._graph.vertices)
         self._components = \
-            dict(izip(self._keys, self._graph.disjointPartitions()))
+            dict(zip(self._keys, self._graph.disjointPartitions()))
 
         bcs, seps = self._graph.biconnectedComponents()
-        self._biconComponents = dict(izip(self._keys, bcs))
+        self._biconComponents = dict(zip(self._keys, bcs))
         self._separators = seps
 
         self._biconComponentMap = dict((v, set()) for v in self._vertices)
         self._separatorMap = dict((k, set()) for k in self._biconComponents)
-        for k, bc in self._biconComponents.iteritems():
+        for k, bc in self._biconComponents.items():
             for v in bc:
                 self._biconComponentMap[v].add(k)
                 if v in self._separators:

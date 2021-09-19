@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
-from PyQt4.QtCore import Qt, QTimer, pyqtSlot
-from PyQt4.QtGui import QApplication, QMainWindow, QColor, QPushButton, \
-    QDialog, QStatusBar, QLayout, QBoxLayout, QLabel, QFileDialog, QMenuBar, \
-    QWidget
+from PyQt5.QtCore import Qt, QTimer, pyqtSlot
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QApplication, QMainWindow,\
+    QPushButton, QDialog, QStatusBar, QLayout, QBoxLayout,\
+    QLabel, QFileDialog, QMenuBar, QWidget
 from QSquareWidget import QSquareWidgetContainer
 from flowboard import FlowBoard
 from flowboardeditor import FlowBoardEditor
@@ -73,13 +74,13 @@ class FlowSolverAppWindow(QMainWindow):
 
     @pyqtSlot(bool)
     def _openClicked(self, _):
-        filepath = QFileDialog.getOpenFileName(caption="open board")
+        filepath = QFileDialog.getOpenFileName(caption="open board")[0]
         if filepath:
             self._editor.loadBoardFile(filepath)
 
     @pyqtSlot(bool)
     def _saveClicked(self, _):
-        filepath = QFileDialog.getSaveFileName(caption="save board")
+        filepath = QFileDialog.getSaveFileName(caption="save board")[0]
         if filepath:
             self._editor.saveBoardFile(filepath)
 
@@ -94,7 +95,7 @@ class FlowSolvingPopup(QDialog):
 
         layout = QBoxLayout(QBoxLayout.TopToBottom)
         layout.setSpacing(0)
-        layout.setMargin(0)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         self._solverWidget = FlowSolverWidget()
         self._solverWidget.finished.connect(self._solverFinished)

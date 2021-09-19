@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 from itertools import product
-from PyQt4.QtCore import Qt, QPoint, QLine, QSize, QRect, QRectF
-from PyQt4.QtGui import QPainter, QColor, QBrush, QPen, QImage, \
+from PyQt5.QtCore import Qt, QPoint, QLine, QLineF, QSize, QRect, QRectF
+from PyQt5.QtGui import QPainter, QColor, QBrush, QPen, QImage, \
     QRadialGradient, QPainterPath
 
 
@@ -86,6 +86,7 @@ class FlowBoardPainter(QPainter):
 
     def drawFlows(self, grid, solver):
         for key, cells in solver.getFlows():
+            cells = list(cells)
             if len(cells) > 1:
                 self._drawFlow(grid, key, cells)
 
@@ -94,7 +95,11 @@ class FlowBoardPainter(QPainter):
         linew = int(grid.minDimension * self._flowwidth)
         self.setPen(QPen(QFlowPalette[key][0], linew,
                     cap=Qt.RoundCap, join=Qt.RoundJoin))
-        self.drawLines(list(FlowBoardPainter._flowLines(grid, cells)))
+
+        # drawLines() should accept a sequence of QLine,
+        # but it complains unless it gets QLineF.
+        # Something wrong with pyqt?
+        self.drawLines(map(QLineF, FlowBoardPainter._flowLines(grid, cells)))
 
     def drawEndpoint(self, rect, key=None, color=None, style=None, scale=None):
         if key is not None:
@@ -309,6 +314,6 @@ class SpacedGrid(object):
             each tuple is (inclusive min, inclusive max)
         """
         lastmax = (end - start) - spacing
-        for i in xrange(divisions):
+        for i in range(divisions):
             yield (spacing + i * lastmax / divisions,
                    (i + 1) * lastmax / divisions - 1)

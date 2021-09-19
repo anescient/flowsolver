@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 from collections import deque
-from itertools import islice, chain, izip, product
+from itertools import islice, chain, product
+from functools import reduce
 from graph import OnlineReducedGraph
 
 
@@ -27,7 +28,7 @@ class FlowPuzzle(object):
                 if v not in self._exclusionMap:
                     self._exclusionMap[v] = set()
                 self._exclusionMap[v] |= es
-        for v, es in self._exclusionMap.iteritems():
+        for v, es in self._exclusionMap.items():
             es.remove(v)
 
     @property
@@ -96,7 +97,7 @@ class FlowSolver(object):
             """
             if self._coverstate is None:
                 headstate = []
-                for hp, blocks in izip(self._headpairs, self._blocks):
+                for hp, blocks in zip(self._headpairs, self._blocks):
                     headstate.append((hp, tuple(blocks)) if blocks else hp)
                 headstate = frozenset(headstate)
                 self._coverstate = \
@@ -158,7 +159,7 @@ class FlowSolver(object):
                 commit = True
                 while commit:
                     commit = None
-                    for k, users in componentusers.iteritems():
+                    for k, users in componentusers.items():
                         if len(users) == 1:
                             commit = (next(iter(users)), k)
                             break
@@ -167,7 +168,7 @@ class FlowSolver(object):
                         if len(self._commoncomponents[i]) > 1:
                             for k_ in self._commoncomponents[i]:
                                 componentusers[k_].remove(i)
-                            self._commoncomponents[i] = set([k])
+                            self._commoncomponents[i] = {k}
                         del componentusers[k]
 
         def _closeVertex(self, v):
@@ -209,8 +210,8 @@ class FlowSolver(object):
             # check that all pairs can be connected and
             # all open vertices can be reached by some pair
             covered = set()
-            for common, (v1, v2) in izip(self._commoncomponents, \
-                                         self._headpairs):
+            for common, (v1, v2) in zip(self._commoncomponents, \
+                                        self._headpairs):
                 if not common and not self._graph.adjacent(v1, v2):
                     return True
                 covered |= common
@@ -240,7 +241,7 @@ class FlowSolver(object):
             bf, bfmap, bfseps = self._reducedgraph.blockForest()
             bf_covered = set()
             bfseps_used = set()
-            for cc, (v1, v2) in izip(self._commoncomponents, self._headpairs):
+            for cc, (v1, v2) in zip(self._commoncomponents, self._headpairs):
                 doconflict = len(cc) == 1 and not self._graph.adjacent(v1, v2)
                 for c_k in cc:
                     v1_in = set(map(bfmap.get, \
@@ -317,8 +318,8 @@ class FlowSolver(object):
                         return None
                 else:
                     assert self._graph.adjacent(v1, v2)
-                    m1 = set([v2])
-                    m2 = set([v1])
+                    m1 = {v2}
+                    m2 = {v1}
                 ms1 = (2 * pairidx, m1)
                 ms2 = (2 * pairidx + 1, m2)
                 if len(m1) == 1:
@@ -482,10 +483,10 @@ class FlowSolver(object):
         self._memo = self._Memo()
 
     def printStats(self):
-        print "{0} visited".format(self._totalframes)
-        print "memo: " + self._memo.stats()
+        print("{0} visited".format(self._totalframes))
+        print("memo: " + self._memo.stats())
         if self.solved:
-            print "solution", hex(abs(self.stateHash()))
+            print("solution" + hex(abs(self.stateHash())))
 
     def getFlows(self):
         return self._Frame.recoverPaths(self._stack)

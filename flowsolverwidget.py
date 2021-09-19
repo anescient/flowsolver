@@ -2,8 +2,9 @@
 
 from os import path
 from datetime import datetime, timedelta
-from PyQt4.QtCore import QCoreApplication, QSize, pyqtSignal
-from PyQt4.QtGui import QWidget, QImageWriter
+from PyQt5.QtCore import QCoreApplication, QSize, pyqtSignal
+from PyQt5.QtGui import QImageWriter
+from PyQt5.QtWidgets import QWidget
 from flowpainter import SpacedGrid, FlowBoardPainter
 from flowboard import FlowBoardSolver
 

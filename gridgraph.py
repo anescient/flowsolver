@@ -18,7 +18,7 @@ class GraphOntoRectangularGrid(object):
         self._height = height
         self._graph = SimpleGraph()
         self._locationMap = {}  # vertex : location
-        for x, y in product(xrange(self._width), xrange(self._height)):
+        for x, y in product(range(self._width), range(self._height)):
             v = self.pushVertex((x, y))
             if x > 0:
                 self._graph.addEdge(v, self.singleVertexAt((x - 1, y)))
@@ -38,7 +38,7 @@ class GraphOntoRectangularGrid(object):
         return self._graph.asReadOnly()
 
     def getLocationMap(self):
-        return dict((v, tuple(c)) for v, c in self._locationMap.iteritems())
+        return dict((v, tuple(c)) for v, c in self._locationMap.items())
 
     def pushVertex(self, xy):
         x, y = xy
@@ -64,7 +64,7 @@ class GraphOntoRectangularGrid(object):
 
     def verticesAt(self, xy):
         """Get the set of any/all vertices mapped to location."""
-        return set(k for k, v in self._locationMap.iteritems() if v == xy)
+        return set(k for k, v in self._locationMap.items() if v == xy)
 
     def singleVertexAt(self, xy):
         """Get the single vertex mapped to location. Error if not 1-to-1."""

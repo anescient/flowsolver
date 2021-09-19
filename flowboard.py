@@ -17,13 +17,13 @@ class FlowBoard(object):
 
     @property
     def endpoints(self):
-        for k, l in self._endpoints.iteritems():
+        for k, l in self._endpoints.items():
             for cell in l:
                 yield (cell, k)
 
     @property
     def endpointPairs(self):
-        for k, l in self._endpoints.iteritems():
+        for k, l in self._endpoints.items():
             assert self.hasCompleteEndpoints(k)
             yield (k, tuple(l))
 
@@ -69,7 +69,7 @@ class FlowBoard(object):
 
     def endpointKeyAt(self, cell):
         assert self._includesCell(cell)
-        for k, l in self._endpoints.iteritems():
+        for k, l in self._endpoints.items():
             if cell in l:
                 return k
         return None
@@ -103,7 +103,7 @@ class FlowBoard(object):
 
     def clear(self, cell):
         assert self._includesCell(cell)
-        for k, l in self._endpoints.iteritems():
+        for k, l in self._endpoints.items():
             if cell in l:
                 l.remove(cell)
                 if not l:
@@ -141,7 +141,7 @@ class FlowBoard(object):
             gridgraph.addEdge(y_adj.pop(), ypass)
             gridgraph.addEdge(y_adj.pop(), ypass)
 
-            exclusiveSets.append(set([xpass, ypass]))
+            exclusiveSets.append({xpass, ypass})
 
         return (FlowPuzzle(gridgraph.graph, endpointPairs, exclusiveSets),
                 gridgraph.getLocationMap())
