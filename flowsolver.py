@@ -57,8 +57,8 @@ class FlowSolver(object):
 
     class _Frame(object):
 
-        def __init__(self, puzzle, reducedgraph, \
-                           headpairs, commoncomponents, blocks):
+        def __init__(self, puzzle, reducedgraph,
+                     headpairs, commoncomponents, blocks):
             self._puzzle = puzzle
             self._graph = self._puzzle.graph
             self._reducedgraph = reducedgraph
@@ -108,8 +108,8 @@ class FlowSolver(object):
             return self._reducedgraph.allMasked and not self._headpairs
 
         def copy(self, move=None):
-            frame = self.__class__(self._puzzle, self._reducedgraph, \
-                                   self._headpairs, self._commoncomponents, \
+            frame = self.__class__(self._puzzle, self._reducedgraph,
+                                   self._headpairs, self._commoncomponents,
                                    self._blocks)
             if move:
                 frame.applyMove(*move)
@@ -210,7 +210,7 @@ class FlowSolver(object):
             # check that all pairs can be connected and
             # all open vertices can be reached by some pair
             covered = set()
-            for common, (v1, v2) in zip(self._commoncomponents, \
+            for common, (v1, v2) in zip(self._commoncomponents,
                                         self._headpairs):
                 if not common and not self._graph.adjacent(v1, v2):
                     return True
@@ -244,9 +244,9 @@ class FlowSolver(object):
             for cc, (v1, v2) in zip(self._commoncomponents, self._headpairs):
                 doconflict = len(cc) == 1 and not self._graph.adjacent(v1, v2)
                 for c_k in cc:
-                    v1_in = set(map(bfmap.get, \
+                    v1_in = set(map(bfmap.get,
                         self._reducedgraph.componentAdjacencies(v1, c_k)))
-                    v2_in = set(map(bfmap.get, \
+                    v2_in = set(map(bfmap.get,
                         self._reducedgraph.componentAdjacencies(v2, c_k)))
                     pcommon = bfseps.copy() if doconflict else None
                     for a, b in product(v1_in, v2_in):
@@ -343,7 +343,7 @@ class FlowSolver(object):
             for leaf in leafs:
                 vidxs = [vidx for vidx, moves in movesets if leaf in moves]
                 if len(vidxs) == 1:
-                    return (vidxs[0], leaf)
+                    return vidxs[0], leaf
             return None
 
         @classmethod
@@ -404,13 +404,13 @@ class FlowSolver(object):
         def stats(self):
             stats = "{0} inserts".format(self._inserts)
             if self._finds > 0 and self._inserts > 0:
-                stats += ", {0:.2%} hit, {1:.2%} return".format(\
-                    self._hits / float(self._finds), \
+                stats += ", {0:.2%} hit, {1:.2%} return".format(
+                    self._hits / float(self._finds),
                     self._hits / float(self._inserts))
             return stats
 
         def _prune(self, limit):
-            keep = islice(\
+            keep = islice(
                 sorted(self._memo, key=self._memo.get, reverse=True), limit)
             self._memo = dict((k, self._memo[k]) for k in keep)
 

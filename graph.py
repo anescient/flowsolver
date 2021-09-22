@@ -249,7 +249,7 @@ class QueryableSimpleGraph(object):
             components.append(subtrees[root])
             del subtrees[root]
         assert not subtrees
-        return (components, separators)
+        return components, separators
 
     def connectedComponent(self, v, mask=None):
         """
@@ -258,7 +258,7 @@ class QueryableSimpleGraph(object):
         """
         toVisit = self._maskVertices(mask)
         toVisit.add(v)
-        component = set([v])
+        component = {v}
         stack = [v]
         while stack:
             v = stack.pop()
@@ -406,7 +406,7 @@ class OnlineReducedGraph(object):
                     vertexmap[v] = bcv
                 for sv in seps:
                     bf.addEdge(bcv, vertexmap[sv])
-        return (bf, vertexmap, articulations)
+        return bf, vertexmap, articulations
 
     def maskVertex(self, v):
         self._vertices = self._vertices.copy()
@@ -433,7 +433,7 @@ class OnlineReducedGraph(object):
                     c_k_new = next(self._keys)
                     self._components[c_k_new] = c_new
                     self._c_kset_new.add(c_k_new)
-                #assert len(self._c_kset_new) > 1
+                # assert len(self._c_kset_new) > 1
             else:
                 self._c_k_reduced = c_k
                 self._components[c_k] = c
@@ -446,20 +446,20 @@ class OnlineReducedGraph(object):
         bc_kset_reduced = None
         if self._c_k_deleted:
             if self._c_kset_new:
-                #assert len(bc_kset) > 1
+                # assert len(bc_kset) > 1
                 bc_kset_reduced = bc_kset
             else:
-                #assert len(bc_kset) == 1
-                #assert len(self._biconComponents[bc_k]) == 1
-                #assert v not in self._separators
-                #assert len(self._separatorMap[bc_k]) == 0
+                # assert len(bc_kset) == 1
+                # assert len(self._biconComponents[bc_k]) == 1
+                # assert v not in self._separators
+                # assert len(self._separatorMap[bc_k]) == 0
                 bc_k = bc_kset.pop()
                 del self._biconComponents[bc_k]
                 del self._separatorMap[bc_k]
         else:
-            #assert self._c_k_reduced
-            #assert v not in self._separators
-            #assert len(bc_kset) == 1
+            # assert self._c_k_reduced
+            # assert v not in self._separators
+            # assert len(bc_kset) == 1
             bc_kset_reduced = bc_kset
 
         if bc_kset_reduced:
@@ -532,7 +532,7 @@ class OnlineReducedGraph(object):
         return v in self._separators
 
     def biconnectedComponents(self):
-        return (self._biconComponents.values(), self._separators)
+        return self._biconComponents.values(), self._separators
 
     def connectedComponent(self, v):
         return self._components[self._findComponent(v)]

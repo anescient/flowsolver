@@ -19,13 +19,13 @@ class FlowBoard(object):
     def endpoints(self):
         for k, l in self._endpoints.items():
             for cell in l:
-                yield (cell, k)
+                yield cell, k
 
     @property
     def endpointPairs(self):
         for k, l in self._endpoints.items():
             assert self.hasCompleteEndpoints(k)
-            yield (k, tuple(l))
+            yield k, tuple(l)
 
     @property
     def bridges(self):
@@ -154,13 +154,13 @@ class FlowBoard(object):
 
     def _adjacentCells(self, cell):
         if cell[0] > 0:
-            yield (cell[0] - 1, cell[1])
+            yield cell[0] - 1, cell[1]
         if cell[0] < self._size - 1:
-            yield (cell[0] + 1, cell[1])
+            yield cell[0] + 1, cell[1]
         if cell[1] > 0:
-            yield (cell[0], cell[1] - 1)
+            yield cell[0], cell[1] - 1
         if cell[1] < self._size - 1:
-            yield (cell[0], cell[1] + 1)
+            yield cell[0], cell[1] + 1
 
 
 class FlowBoardSolver(FlowSolver):
@@ -178,4 +178,4 @@ class FlowBoardSolver(FlowSolver):
 
     def getFlows(self):
         for vflow in super(FlowBoardSolver, self).getFlows():
-            yield (self._vertexKey[vflow[0]], map(self._cellmap.get, vflow))
+            yield self._vertexKey[vflow[0]], map(self._cellmap.get, vflow)

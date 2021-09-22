@@ -42,8 +42,8 @@ class GraphOntoRectangularGrid(object):
 
     def pushVertex(self, xy):
         x, y = xy
-        assert x >= 0 and x < self._width
-        assert y >= 0 and y < self._height
+        assert 0 <= x < self._width
+        assert 0 <= y < self._height
         v = self._graph.pushVertex()
         self._locationMap[v] = xy
         return v

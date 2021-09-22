@@ -39,7 +39,7 @@ class FlowSolverWidget(QWidget):
             self._solver = None
         else:
             self._board = board
-            self._grid = SpacedGrid(\
+            self._grid = SpacedGrid(
                 self._board.size, self._board.size, self.rect().size(), 2)
             self._solver = FlowBoardSolver(self._board)
 

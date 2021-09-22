@@ -285,16 +285,16 @@ class SpacedGrid(object):
         ri = SpacedGrid._searchRanges(self._rows, point.y())
         if ri is None:
             return None
-        return (ci, ri)
+        return ci, ri
 
     def _spacings(self, ranges):
         """
             yield 'divisions + 1' 2-tuples
             each tuple is (inclusive min, exclusive max)
         """
-        yield (0, self._spacing)
+        yield 0, self._spacing
         for r in ranges:
-            yield (r[1] + 1, r[1] + 1 + self._spacing)
+            yield r[1] + 1, r[1] + 1 + self._spacing
 
     @staticmethod
     def _centers(ranges):
@@ -303,7 +303,7 @@ class SpacedGrid(object):
     @staticmethod
     def _searchRanges(ranges, value):
         for i, r in enumerate(ranges):
-            if value >= r[0] and value <= r[1]:
+            if r[0] <= value <= r[1]:
                 return i
         return None
 
