@@ -16,6 +16,7 @@ from graph import OnlineReducedGraph
 # All paths are vertex-disjoint and their union spans the graph,
 # in other words, every vertex in the graph appears in exactly one path.
 # Each path may include at most one vertex from each exclusive set.
+# noinspection PyPep8Naming
 class FlowPuzzle(object):
     def __init__(self, graph, endpointPairs, exclusiveSets):
         self._graph = graph
@@ -244,10 +245,10 @@ class FlowSolver(object):
             for cc, (v1, v2) in zip(self._commoncomponents, self._headpairs):
                 doconflict = len(cc) == 1 and not self._graph.adjacent(v1, v2)
                 for c_k in cc:
-                    v1_in = set(map(bfmap.get,
-                        self._reducedgraph.componentAdjacencies(v1, c_k)))
-                    v2_in = set(map(bfmap.get,
-                        self._reducedgraph.componentAdjacencies(v2, c_k)))
+                    v1_in = set(map(
+                        bfmap.get, self._reducedgraph.componentAdjacencies(v1, c_k)))
+                    v2_in = set(map(
+                        bfmap.get, self._reducedgraph.componentAdjacencies(v2, c_k)))
                     pcommon = bfseps.copy() if doconflict else None
                     for a, b in product(v1_in, v2_in):
                         p = set(bf.shortestPath(a, b))
@@ -291,6 +292,8 @@ class FlowSolver(object):
             bcs, _ = self._reducedgraph.biconnectedComponents()
             if len(bcs) > 1:
                 focus = min(bcs, key=len)
+                # assert type(focus) is set
+                # noinspection PyTypeChecker
                 focusmovesets = [ms for ms in movesets if ms[1] & focus]
                 movesets = focusmovesets or movesets
 
@@ -338,6 +341,8 @@ class FlowSolver(object):
             # If such a move exists now, it must eventually be taken.
             allmoves = reduce(set.union, (moves for _, moves in movesets))
             leafs = []
+            # assert type(allmoves) is set
+            # noinspection PyUnresolvedReferences
             for m in allmoves.intersection(self._reducedgraph.vertices):
                 if len(self._reducedgraph.adjacencies(m)) == 1:
                     leafs.append(m)
@@ -355,10 +360,10 @@ class FlowSolver(object):
                 reducedgraph.maskVertex(v)
             commoncomponents = []
             for v1, v2 in headpairs:
-                commoncomponents.append(reducedgraph.adjacentComponents(v1) & \
+                commoncomponents.append(reducedgraph.adjacentComponents(v1) &
                                         reducedgraph.adjacentComponents(v2))
             blocks = [set()] * len(headpairs)
-            return cls(puzzle, reducedgraph, \
+            return cls(puzzle, reducedgraph,
                        headpairs, commoncomponents, blocks)
 
         @staticmethod

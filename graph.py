@@ -5,6 +5,7 @@ from itertools import count
 from functools import reduce
 
 
+# noinspection PyPep8Naming
 class QueryableSimpleGraph(object):
     def __init__(self, edgeSets):
         self._edges = edgeSets
@@ -93,7 +94,7 @@ class QueryableSimpleGraph(object):
         if self.adjacent(v1, v2):
             return True
         toVisit = self._maskVertices(mask)
-        front1, front2 = set([v1]), set([v2])
+        front1, front2 = {v1}, {v2}
         while front1:
             toVisit -= front1
             front1 = reduce(set.union,
@@ -119,7 +120,7 @@ class QueryableSimpleGraph(object):
         mask_a.discard(v2)
         mask_b = mask_a.copy()
         trees = {v1: None, v2: None}  # vertex: parent
-        leafs_a, leafs_b = set([v1]), set([v2])
+        leafs_a, leafs_b = {v1}, {v2}
         join = None
         while mask_a and join is None:
             leafs = set()
@@ -164,7 +165,7 @@ class QueryableSimpleGraph(object):
             return self.connected(next(it), next(it), mask)
         toVisit = self._maskVertices(mask)
         toVisit.update(vertices)
-        fronts = deque(set([v]) for v in vertices)
+        fronts = deque({v} for v in vertices)
         while len(fronts) > 1:
             front = fronts.popleft()
             joined = False
@@ -201,7 +202,7 @@ class QueryableSimpleGraph(object):
             mask: use only these vertices and their incident edges
         """
         vertices = self._maskVertices(mask)
-        subtrees = dict((v, set([v])) for v in vertices)
+        subtrees = dict((v, {v}) for v in vertices)
         adjs = dict((v, self._edges[v] & vertices) for v in vertices)
         components = []
         separators = set()
@@ -291,6 +292,7 @@ class QueryableSimpleGraph(object):
         return set(self._edges if mask is None else mask)
 
 
+# noinspection PyPep8Naming
 class SimpleGraph(QueryableSimpleGraph):
     def __init__(self, edgeSets=None):
         if isinstance(edgeSets, QueryableSimpleGraph):
