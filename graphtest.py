@@ -63,6 +63,7 @@ def _testGraph():
     assert s == set(verts)
     edgeCount = 0
     assert g.edgeCount() == edgeCount
+    assert g.edgeCount(without=set()) == g.edgeCount()
     for i in range(len(verts) - 1):
         edgeCount += 1
         g.addEdge(verts[i], verts[i + 1])
@@ -75,6 +76,7 @@ def _testGraph():
                 assert g.connected(verts[j], verts[0])
             assert g.connectedComponent(verts[j]) == set(verts[:i + 2])
         assert g.edgeCount() == edgeCount
+    assert g.edgeCount(without=set()) == g.edgeCount()
     for v in verts:
         assert g.connectedComponent(v) == set(verts)
     assert g.isConnectedSet(verts)
@@ -101,6 +103,7 @@ def _testGraph():
     g.removeEdge(verts[-1], shortcut)
     assert g.shortestPath(shortcut, verts[1]) == [shortcut, verts[0], verts[1]]
     edgeCount -= len(g.adjacencies(shortcut))
+    assert g.edgeCount(without={shortcut}) == edgeCount
     g.removeVertex(shortcut)
     assert g.edgeCount() == edgeCount
     # noinspection PyUnusedLocal
@@ -145,6 +148,8 @@ def _testGraph():
     assert g.connectedComponent(verts[0]) == set(verts)
     assert g.connected(verts[0], verts[-1])
     assert g.isConnectedSet(set(verts[:1] + verts[-1:]))
+    assert g.edgeCount(without={3, 6}) == g.edgeCount() - 5
+    assert g.edgeCount(without={0, 9}) == g.edgeCount() - 4
 
 
 def _equalSetSets(sets_a, sets_b):

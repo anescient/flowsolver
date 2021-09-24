@@ -24,12 +24,23 @@ class QueryableSimpleGraph(object):
     def vertices(self):
         return iter(self._edges)
 
-    def edgeCount(self):
-        return sum(map(len, self._edges.values())) // 2
+    def edgeCount(self, mask=None, *, without=None):
         """
             Return number of adjacent vertex pairs.
             mask: use only these vertices and their incident edges
+            without: do not include these vertices and their edges
         """
+        if mask is None and not without:
+            return sum(map(len, self._edges.values())) // 2
+        vertices = self._maskVertices(mask)
+        halfEdges = 0
+        if without:
+            for v in vertices - without:
+                halfEdges += len(self._edges[v] - without)
+        else:
+            for v in vertices:
+                halfEdges += len(self._edges[v])
+        return halfEdges // 2
 
     def copyEdgeSets(self):
         return dict((v, adj.copy()) for v, adj in self._edges.items())
@@ -395,6 +406,9 @@ class OnlineReducedGraph(object):
     @property
     def components(self):
         return self._components
+
+    def edgeCount(self):
+        return self._graph.edgeCount(self._vertices)
 
     def blockForest(self):
         bf = SimpleGraph()
