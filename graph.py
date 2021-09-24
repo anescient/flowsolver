@@ -24,6 +24,13 @@ class QueryableSimpleGraph(object):
     def vertices(self):
         return iter(self._edges)
 
+    def edgeCount(self):
+        return sum(map(len, self._edges.values())) // 2
+        """
+            Return number of adjacent vertex pairs.
+            mask: use only these vertices and their incident edges
+        """
+
     def copyEdgeSets(self):
         return dict((v, adj.copy()) for v, adj in self._edges.items())
 

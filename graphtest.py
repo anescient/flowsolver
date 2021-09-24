@@ -61,7 +61,10 @@ def _testGraph():
         assert len(p) == 1
         s.add(p.pop())
     assert s == set(verts)
+    edgeCount = 0
+    assert g.edgeCount() == edgeCount
     for i in range(len(verts) - 1):
+        edgeCount += 1
         g.addEdge(verts[i], verts[i + 1])
         for v in verts[i + 2:]:
             assert not g.connected(verts[i + 1], v)
@@ -71,6 +74,7 @@ def _testGraph():
                 assert g.connected(verts[0], verts[j])
                 assert g.connected(verts[j], verts[0])
             assert g.connectedComponent(verts[j]) == set(verts[:i + 2])
+        assert g.edgeCount() == edgeCount
     for v in verts:
         assert g.connectedComponent(v) == set(verts)
     assert g.isConnectedSet(verts)
@@ -86,15 +90,21 @@ def _testGraph():
     assert g.shortestPath(verts[3], verts[3]) == [verts[3]]
 
     shortcut = g.pushVertex()
+    edgeCount += 2
     g.addEdge(verts[0], shortcut)
     g.addEdge(verts[-1], shortcut)
     assert g.shortestPath(verts[0], verts[-1]) == \
         [verts[0], shortcut, verts[-1]]
 
     assert verts[0] == 0
+    edgeCount -= 1
     g.removeEdge(verts[-1], shortcut)
     assert g.shortestPath(shortcut, verts[1]) == [shortcut, verts[0], verts[1]]
+    edgeCount -= len(g.adjacencies(shortcut))
     g.removeVertex(shortcut)
+    assert g.edgeCount() == edgeCount
+    # noinspection PyUnusedLocal
+    edgeCount = None
 
     g.addEdge(verts[0], verts[-1])
     assert g.shortestPath(verts[0], verts[-1]) == [verts[0], verts[-1]]
