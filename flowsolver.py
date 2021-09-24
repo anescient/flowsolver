@@ -276,7 +276,7 @@ class FlowSolver(object):
 
         def _bestMoves(self):
             movesets = self._possibleMoves()
-            if movesets is None:
+            if not movesets:
                 return []
             if len(movesets) == 1:
                 vidx, moves = movesets[0]
@@ -316,8 +316,9 @@ class FlowSolver(object):
                         m2.add(v1)
                     if not m1 or not m2:
                         return None
+                elif not self._graph.adjacent(v1, v2):
+                    return []
                 else:
-                    assert self._graph.adjacent(v1, v2)
                     m1 = {v2}
                     m2 = {v1}
                 ms1 = (2 * pairidx, m1)
