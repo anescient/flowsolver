@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from gridgraph import GraphOntoRectangularGrid
+from graph import GraphOntoRectangularGrid
 from flowsolver import FlowPuzzle, FlowSolver
 
 
