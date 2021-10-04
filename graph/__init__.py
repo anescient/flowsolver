@@ -1,2 +1,3 @@
-from .graph import SimpleGraph, QueryableSimpleGraph, OnlineReducedGraph
+from .simplegraph import SimpleGraph, QueryableSimpleGraph
+from .reducedgraph import OnlineReducedGraph
 from .gridgraph import GraphOntoRectangularGrid
