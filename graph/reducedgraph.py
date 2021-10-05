@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from functools import reduce
-from itertools import count
+from itertools import count, combinations
 
 from graph import SimpleGraph
 
@@ -257,3 +257,33 @@ class OnlineReducedGraph(object):
                 self._biconComponentMap[v].add(k)
                 if v in self._separators:
                     self._separatorMap[k].add(v)
+
+    def _assertValidState(self):
+        assert self._vertices == set(self._biconComponentMap)
+        componentSum = set()
+        for k, c in self._components.items():
+            assert c
+            assert not c & componentSum
+            componentSum |= c
+        assert self._vertices == componentSum
+        for v, kset in self._biconComponentMap.items():
+            assert kset
+            assert (len(kset) > 1) == (v in self._separators)
+            for k in kset:
+                assert v in self._biconComponents[k]
+        assert set(self._separatorMap) == set(self._biconComponents)
+        for k, vset in self._separatorMap.items():
+            assert vset == self._separators & self._biconComponents[k]
+        for bc1, bc2 in combinations(self._biconComponents.values(), 2):
+            assert len(bc1 & bc2) < 2
+            assert not bc1.issubset(bc2)
+            assert not bc2.issubset(bc1)
+        bcs, seps = self._graph.biconnectedComponents(self._vertices)
+        assert seps == self._separators
+        assert len(bcs) == len(self._biconComponents)
+        for k, bc in self._biconComponents.items():
+            assert bc
+            bcs, seps = self._graph.biconnectedComponents(bc)
+            assert len(bcs) == 1 and not seps
+            for v, kset in self._biconComponentMap.items():
+                assert (k in kset) == (v in bc)

@@ -7,38 +7,6 @@ from functools import reduce
 from graph import SimpleGraph, QueryableSimpleGraph, OnlineReducedGraph
 
 
-# noinspection PyProtectedMember
-def _checkOnlineReducedGraph(rg):
-    assert rg._vertices == set(rg._biconComponentMap)
-    componentSum = set()
-    for k, c in rg._components.items():
-        assert c
-        assert not c & componentSum
-        componentSum |= c
-    assert rg._vertices == componentSum
-    for v, kset in rg._biconComponentMap.items():
-        assert kset
-        assert (len(kset) > 1) == (v in rg._separators)
-        for k in kset:
-            assert v in rg._biconComponents[k]
-    assert set(rg._separatorMap) == set(rg._biconComponents)
-    for k, vset in rg._separatorMap.items():
-        assert vset == rg._separators & rg._biconComponents[k]
-    for bc1, bc2 in combinations(rg._biconComponents.values(), 2):
-        assert len(bc1 & bc2) < 2
-        assert not bc1.issubset(bc2)
-        assert not bc2.issubset(bc1)
-    bcs, seps = rg._graph.biconnectedComponents(rg._vertices)
-    assert seps == rg._separators
-    assert len(bcs) == len(rg._biconComponents)
-    for k, bc in rg._biconComponents.items():
-        assert bc
-        bcs, seps = rg._graph.biconnectedComponents(bc)
-        assert len(bcs) == 1 and not seps
-        for v, kset in rg._biconComponentMap.items():
-            assert (k in kset) == (v in bc)
-
-
 def _testGraph():
     g = SimpleGraph()
     assert isinstance(g, QueryableSimpleGraph)
@@ -226,7 +194,8 @@ def _testGraphBiconnected():
                 assert not bc2.issubset(bc1)
 
             rg = rgstack.pop(0)
-            _checkOnlineReducedGraph(rg)
+            # noinspection PyProtectedMember
+            rg._assertValidState()
             rg_bcs, rg_seps = rg.biconnectedComponents()
             assert _equalSetSets(bcs, rg_bcs)
             assert seps == rg_seps
