@@ -98,6 +98,7 @@ class QueryableSimpleGraph(object):
             toVisit -= front1
             front1 = reduce(set.union,
                             (self.adjacencies(v, toVisit) for v in front1))
+            assert isinstance(front1, set)
             if front1.intersection(front2):
                 return True
             front1, front2 = front2, front1
@@ -179,6 +180,7 @@ class QueryableSimpleGraph(object):
                            (self.adjacencies(v, toVisit) for v in front))
             if not front:
                 return False
+            assert isinstance(front, set)
             fronts.append(front)
         return True
 
