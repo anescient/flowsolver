@@ -40,7 +40,7 @@ class QueryableSimpleGraph(object):
         return halfEdges // 2
 
     def copyEdgeSets(self):
-        return dict((v, adj.copy()) for v, adj in self._edges.items())
+        return {v: adj.copy() for v, adj in self._edges.items()}
 
     def adjacent(self, v1, v2):
         """Return True iff v1 and v2 share an edge."""
@@ -56,6 +56,9 @@ class QueryableSimpleGraph(object):
         else:
             return self._edges[v].intersection(mask)
 
+    def degree(self, v):
+        """Return number of vertices adjacent to v."""
+        return len(self._edges[v])
 
     def sortClosest(self, vertices, target, mask=None):
         """
@@ -302,8 +305,19 @@ class SimpleGraph(QueryableSimpleGraph):
     def pushVertex(self):
         """Return new vertex id."""
         v = max(self._edges) + 1 if self._edges else 0
-        self._edges[v] = set()
+        self.addVertex(v)
         return v
+
+    def addVertex(self, v):
+        """Add a vertex with id v."""
+        if v in self._edges:
+            raise ValueError
+        self._edges[v] = set()
+
+    def addVertices(self, verts):
+        """Add multiple vertices with given ids."""
+        for v in verts:
+            self.addVertex(v)
 
     def removeVertex(self, v):
         """Delete a vertex and any incident edges."""

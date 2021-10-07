@@ -16,6 +16,11 @@ def _testGraph():
     verts = []
     for i in range(10):
         verts.append(g.pushVertex())
+    try:
+        g.addVertex(verts[0])
+        raise AssertionError
+    except ValueError:
+        pass
     assert len(set(verts)) == len(verts)
     for v in verts:
         assert not g.adjacencies(v)
@@ -180,6 +185,10 @@ def _testGraphBiconnected():
     for es in edgesets:
         es = deepcopy(es)
         g = SimpleGraph(es)
+        g2 = SimpleGraph(g)
+        assert set(g.vertices) == set(g2.vertices)
+        g2.removeVertex(list(g2.vertices)[0])
+        assert set(g.vertices) != set(g2.vertices)
         verts = set(g.vertices)
         vertlist = list(verts)
         random.shuffle(vertlist)
@@ -242,7 +251,61 @@ def _testGraphBiconnected():
             g.removeVertex(v)
 
 
+def _build4by4():
+    # makes a grid structure like:
+    # 0 - 1 - 2 - 3
+    # !   !   !   !
+    # 4 - 5 - 6 - 7
+    # !   !   !   !
+    # 8 - 9 - 10- 11
+    # !   !   !   !
+    # 12- 13- 14- 15
+    g = SimpleGraph()
+    g.addVertices(range(16))
+    for k in range(0, 16, 4):
+        for i in range(k, k + 3):
+            g.addEdge(i, i + 1)
+    for k in range(4):
+        for i in range(k, 12, 4):
+            g.addEdge(i, i + 4)
+    for i in [0, 3, 12, 15]:
+        assert g.degree(i) == 2
+    for i in [1, 2, 7, 11, 14, 13, 8, 4]:
+        assert g.degree(i) == 3
+    for i in [5, 6, 9, 10]:
+        assert g.degree(i) == 4
+    return g
+
+
+def _testSortClosest():
+    g = _build4by4()
+    assert g.sortClosest([], 0) == []
+    verts = [5, 1, 0, 7, 14, 15]
+    assert g.sortClosest(verts, 5) == verts
+    verts = [15, 11, 7, 3]
+    assert g.sortClosest(verts, 13) == verts
+    verts = [13, 14, 15]
+    assert g.sortClosest(verts, 8) == verts
+
+    mask = set(g.vertices)
+    mask.remove(13)
+    mask.remove(14)
+    assert g.sortClosest(verts, 8, mask) == [15]
+    mask.remove(10)
+    mask.remove(7)
+    assert g.sortClosest(verts, 8, mask) == []
+
+    g.removeVertex(9)
+    g.removeVertex(12)
+    g.removeVertex(6)
+    verts.reverse()
+    assert g.sortClosest(verts, 8) == verts
+    g.removeVertex(2)
+    assert g.sortClosest(verts, 8) == []
+
+
 if __name__ == '__main__':
+    _testSortClosest()
     _testGraph()
     _testGraphBiconnected()
     print("Tests passed.")
