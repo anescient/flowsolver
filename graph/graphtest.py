@@ -97,7 +97,7 @@ def _testGraph():
     assert g.isConnectedSet(parts[1])
     for v1 in parts[0]:
         for v2 in parts[1]:
-            assert g.shortestPath(v1, v2, mask) is None
+            assert g.shortestPath(v1, v2, mask) == []
     assert not g.isConnectedSet(mask, mask)
     assert verts[2] not in parts[0].union(parts[1])
     assert parts[0].union(parts[1]) == set(verts) - set(verts[2:3])
@@ -332,13 +332,41 @@ def _testSortClosest():
     mask.remove(7)
     assert g.sortClosest(verts, 8, mask) == []
 
-    g.removeVertex(9)
-    g.removeVertex(12)
-    g.removeVertex(6)
+    g.removeVertices([9, 12, 6])
     verts.reverse()
     assert g.sortClosest(verts, 8) == verts
     g.removeVertex(2)
     assert g.sortClosest(verts, 8) == []
+
+
+def _testShortestPath():
+    g = _build4by4()
+    assert g.shortestPath(0, 12) == [0, 4, 8, 12]
+    assert g.shortestPath(12, 0) == [12, 8, 4, 0]
+    assert g.shortestPath(1, 9) == [1, 5, 9]
+    g.removeVertices([4, 5, 6])
+    assert g.shortestPath(1, 9) == [1, 2, 3, 7, 11, 10, 9]
+    v_a = g.pushVertex()
+    g.addEdge(v_a, 2)
+    g.addEdge(v_a, 10)
+    assert g.shortestPath(1, 9) == [1, 2, v_a, 10, 9]
+    v_b = g.pushVertex()
+    g.addEdge(v_b, 3)
+    g.addEdge(v_b, 15)
+    assert g.shortestPath(1, 15) == [1, 2, 3, v_b, 15]
+    assert g.shortestPath(15, 2) == [15, v_b, 3, 2]
+    g.removeVertices([v_a, v_b, 13])
+    assert g.shortestPath(8, 14) == [8, 9, 10, 14]
+    g.removeVertex(10)
+    assert g.shortestPath(8, 14) == []
+    v_c = g.pushVertex()
+    g.addEdge(v_c, 9)
+    g.addEdge(v_c, 2)
+    assert g.shortestPath(8, 14) == [8, 9, v_c, 2, 3, 7, 11, 15, 14]
+    v_d = g.pushVertex()
+    g.addEdge(v_d, v_c)
+    g.addEdge(v_d, 11)
+    assert g.shortestPath(8, 14) == [8, 9, v_c, v_d, 11, 15, 14]
 
 
 if __name__ == '__main__':
@@ -346,5 +374,6 @@ if __name__ == '__main__':
     _testReducedGraph()
     _testGraphBiconnected()
     _testSortClosest()
+    _testShortestPath()
     print("Tests passed.")
     exit(0)

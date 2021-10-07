@@ -108,7 +108,6 @@ class QueryableSimpleGraph(object):
         """
             Return a minimal list of vertices connecting v1 to v2.
                 path[0] == v1, path[-1] == v2
-            Return None if not connected.
             mask: use only these vertices and their incident edges
         """
         if v1 == v2:
@@ -142,7 +141,7 @@ class QueryableSimpleGraph(object):
             leafs_a, leafs_b = leafs_b, leafs
             mask_a, mask_b = mask_b, mask_a
         if join is None:
-            return None
+            return []
         path1, path2 = [join[0]], [join[1]]
         for path in (path1, path2):
             while trees[path[-1]] is not None:
@@ -326,6 +325,11 @@ class SimpleGraph(QueryableSimpleGraph):
         for adj in self._edges[v]:
             self._edges[adj].remove(v)
         del self._edges[v]
+
+    def removeVertices(self, verts):
+        """Delete multiple vertices and incident edges."""
+        for v in verts:
+            self.removeVertex(v)
 
     def addEdge(self, v1, v2):
         """Connect v1 and v2. Error if loop or already connected."""
