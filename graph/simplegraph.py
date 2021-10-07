@@ -32,13 +32,11 @@ class QueryableSimpleGraph(object):
         if mask is None and not without:
             return sum(map(len, self._edges.values())) // 2
         vertices = self._maskVertices(mask)
-        halfEdges = 0
         if without:
-            for v in vertices - without:
-                halfEdges += len(self._edges[v] - without)
-        else:
-            for v in vertices:
-                halfEdges += len(self._edges[v])
+            vertices = vertices - without
+        halfEdges = 0
+        for v in vertices:
+            halfEdges += len(self._edges[v].intersection(vertices))
         return halfEdges // 2
 
     def copyEdgeSets(self):

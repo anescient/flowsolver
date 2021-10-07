@@ -45,7 +45,9 @@ def _testGraph():
             assert g.connectedComponent(verts[j]) == set(verts[:i + 2])
         assert g.edgeCount() == edgeCount
     assert g.edgeCount(without=set()) == g.edgeCount()
+    assert g.edgeCount(mask=verts) == g.edgeCount()
     for v in verts:
+        assert g.edgeCount(mask={v}) == 0
         assert g.connectedComponent(v) == set(verts)
     assert g.isConnectedSet(verts)
     assert g.isConnectedSet([verts[2], verts[4]], verts[2:5])
