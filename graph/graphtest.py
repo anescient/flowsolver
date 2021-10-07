@@ -127,6 +127,43 @@ def _testGraph():
     assert g.edgeCount(without={0, 9}) == g.edgeCount() - 4
 
 
+def _testReducedGraph():
+    og = _build4by4()
+    g = OnlineReducedGraph(og)
+    for v in g.vertices:
+        assert g.adjacencies(v) == og.adjacencies(v)
+    c = list(g.components.keys())[0]
+    assert g.componentDeleted is None
+    assert g.componentReduced is None
+    assert g.newSubComponents is None
+    assert g.separatorsChanged is False
+    assert g.allMasked is False
+    assert g.disjoint is False
+    assert g.vertices == set(range(16))
+    assert len(g.components) == 1
+    assert g.edgeCount() == 24
+    for v in [5, 6, 9, 10]:
+        g.maskVertex(v)
+        assert g.separatorsChanged is False
+        assert len(g.components) == 1
+        assert c in g.components
+        assert g.componentReduced == c
+    assert g.sortClosest([1, 2, 3], 11) == [3, 2, 1]
+    g.maskVertex(7)
+    assert g.sortClosest([1, 2, 3], 11) == [1, 2, 3]
+    assert g.separatorsChanged is True
+    assert len(g.components) == 1
+    assert c in g.components
+    assert g.componentDeleted is None
+    g.maskVertex(13)
+    assert g.sortClosest([1, 2, 3], 11) == []
+    assert g.separatorsChanged is True
+    assert len(g.components) == 2
+    assert g.newSubComponents == set(g.components.keys())
+    assert g.componentDeleted == c
+    assert g.disjoint is True
+
+
 def _equalSetSets(sets_a, sets_b):
     sets_a = set(frozenset(s) for s in sets_a)
     sets_b = set(frozenset(s) for s in sets_b)
@@ -305,8 +342,9 @@ def _testSortClosest():
 
 
 if __name__ == '__main__':
-    _testSortClosest()
     _testGraph()
+    _testReducedGraph()
     _testGraphBiconnected()
+    _testSortClosest()
     print("Tests passed.")
     exit(0)

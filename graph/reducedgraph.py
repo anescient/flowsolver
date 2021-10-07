@@ -36,18 +36,22 @@ class OnlineReducedGraph(object):
 
     @property
     def componentDeleted(self):
+        """Key of component eliminated in last op, or None"""
         return self._c_k_deleted
 
     @property
     def componentReduced(self):
+        """Key of component reduced in last op, or None"""
         return self._c_k_reduced
 
     @property
     def newSubComponents(self):
+        """Keys of (sub)components created in last op, or None"""
         return self._c_kset_new
 
     @property
     def separatorsChanged(self):
+        """Whether or not separators were changed in last op"""
         return self._separatorsChanged
 
     @property
@@ -198,12 +202,15 @@ class OnlineReducedGraph(object):
                 self._separatorsChanged = True
 
     def adjacencies(self, v):
+        """Get neighbors of v"""
         return self._graph.adjacencies(v, self._vertices)
 
     def componentAdjacencies(self, v, k):
+        """Get neighbors of v in component k"""
         return self._graph.adjacencies(v, self._components[k])
 
     def componentsAdjacencies(self, v, kset):
+        """Get neighbors of v in any of many components"""
         mask = reduce(set.union, map(self._components.get, kset))
         return self._graph.adjacencies(v, mask)
 
