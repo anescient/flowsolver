@@ -368,6 +368,17 @@ def _testShortestPath():
     g.addEdge(v_d, 11)
     assert g.shortestPath(8, 14) == [8, 9, v_c, v_d, 11, 15, 14]
 
+    g = OnlineReducedGraph(_build4by4())
+    assert g.shortestPath(1, 9) == [1, 5, 9]
+    g.maskVertex(4)
+    g.maskVertex(5)
+    g.maskVertex(6)
+    assert g.shortestPath(1, 9) == [1, 2, 3, 7, 11, 10, 9]
+    g.maskVertex(13)
+    assert g.shortestPath(8, 14) == [8, 9, 10, 14]
+    g.maskVertex(10)
+    assert g.shortestPath(8, 14) == []
+
 
 if __name__ == '__main__':
     _testGraph()

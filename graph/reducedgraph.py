@@ -233,6 +233,9 @@ class OnlineReducedGraph(object):
         adj = self._graph.adjacencies(v, self._vertices)
         return set(c_k for c_k, c in self._components.items() if adj & c)
 
+    def shortestPath(self, v1, v2):
+        return self._graph.shortestPath(v1, v2, self._vertices)
+
     def _findComponent(self, v):
         for c_k, c in self._components.items():
             if v in c:
