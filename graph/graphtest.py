@@ -380,11 +380,39 @@ def _testShortestPath():
     assert g.shortestPath(8, 14) == []
 
 
+def _testEccentricity():
+    g = _build4by4()
+    for v in g.vertices:
+        if g.degree(v) == 2:
+            assert g.eccentricity(v) == 6
+        elif g.degree(v) == 4:
+            assert g.eccentricity(v) == 4
+        else:
+            assert g.degree(v) == 3
+            assert g.eccentricity(v) == 5
+    v_a = g.pushVertex()
+    assert g.eccentricity(v_a) == 0
+    v_b = g.pushVertex()
+    g.addEdge(v_a, v_b)
+    assert g.eccentricity(v_a) == 1
+    g.addEdge(v_a, 7)
+    assert g.eccentricity(v_a) == 6
+    assert g.eccentricity(v_b) == g.eccentricity(v_a) + 1
+    assert g.eccentricity(12) == 7
+    g.addEdge(v_b, 15)
+    assert g.eccentricity(12) == 6
+    mask = set(g.vertices) - {13, 9}
+    assert g.eccentricity(12, mask) == 7
+    g.removeEdge(v_a, 7)
+    assert g.eccentricity(12, mask) == 9
+
+
 if __name__ == '__main__':
     _testGraph()
     _testReducedGraph()
     _testGraphBiconnected()
     _testSortClosest()
     _testShortestPath()
+    _testEccentricity()
     print("Tests passed.")
     exit(0)

@@ -292,8 +292,7 @@ class FlowSolver(object):
             bcs, _ = self._reducedgraph.biconnectedComponents()
             if len(bcs) > 1:
                 focus = min(bcs, key=len)
-                # assert type(focus) is set
-                # noinspection PyTypeChecker
+                assert isinstance(focus, set)
                 focusmovesets = [ms for ms in movesets if ms[1] & focus]
                 movesets = focusmovesets or movesets
 
@@ -340,9 +339,8 @@ class FlowSolver(object):
             # one other open vertex and one path head.
             # If such a move exists now, it must eventually be taken.
             allmoves = reduce(set.union, (moves for _, moves in movesets))
+            assert isinstance(allmoves, set)
             leafs = []
-            # assert type(allmoves) is set
-            # noinspection PyUnresolvedReferences
             for m in allmoves.intersection(self._reducedgraph.vertices):
                 if len(self._reducedgraph.adjacencies(m)) == 1:
                     leafs.append(m)

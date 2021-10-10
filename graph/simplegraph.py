@@ -60,6 +60,24 @@ class QueryableSimpleGraph(object):
         """Return number of vertices adjacent to v."""
         return len(self._edges[v])
 
+    def eccentricity(self, v, mask=None):
+        """
+            Return number of edges from v to most distant vertex.
+            mask: use only these vertices and their incident edges
+        """
+        vertices = self._maskVertices(mask)
+        visited = set()
+        front = {v}
+        rounds = 0
+        while front:
+            nextfront = reduce(set.union, (self._edges[v] for v in front))
+            assert isinstance(nextfront, set)
+            visited |= front
+            front = (nextfront & vertices) - visited
+            if front:
+                rounds += 1
+        return rounds
+
     def sortClosest(self, vertices, target, mask=None):
         """
             Return 'vertices' ordered by increasing distance from 'target'.
