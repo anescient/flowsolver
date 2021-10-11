@@ -279,12 +279,12 @@ class FlowSolver(object):
             movesets = self._possibleMoves()
             if not movesets:
                 return []
-            if len(movesets) == 1:
-                vidx, moves = movesets[0]
-                return ((vidx, to) for to in moves)
             leafmove = self._leafMove(movesets)
             if leafmove:
                 return [leafmove]
+            for vidx, moves in movesets:
+                if len(moves) == 1:
+                    return ((vidx, to) for to in moves)
 
             # not sure why this helps as much as it does
             # maybe by increasing chance of memo hit?
