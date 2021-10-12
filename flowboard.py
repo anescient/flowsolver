@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import pickle
 
 from graph import GraphOntoRectangularGrid
 from flowsolver import FlowPuzzle, FlowSolver
@@ -10,6 +11,21 @@ class FlowBoard(object):
         self._endpoints = {}  # key: list (length 1 or 2) of 2-tuples
         self._bridges = set()  # 2-tuples
         self._blockages = set()  # 2-tuples
+
+    def saveFile(self, filepath):
+        pickle.dump(self, open(filepath, 'wb'))
+
+    @staticmethod
+    def parseFile(filepath):
+        try:
+            loadboard = pickle.load(open(filepath, 'rb'))
+        except (FileNotFoundError, pickle.UnpicklingError):
+            return None
+        if not isinstance(loadboard, FlowBoard):
+            return None
+        board = FlowBoard(loadboard.size)
+        board.__dict__.update(loadboard.__dict__)
+        return board
 
     @property
     def size(self):

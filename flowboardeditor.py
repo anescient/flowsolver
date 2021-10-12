@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import pickle
 from copy import deepcopy
 from PyQt5.QtCore import Qt, QSize, QObject, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QColor, QPen, QImage
@@ -53,14 +52,12 @@ class FlowBoardEditor(QWidget):
         return deepcopy(self._board)
 
     def loadBoardFile(self, filepath):
-        loadboard = pickle.load(open(filepath, 'rb'))
-        if isinstance(loadboard, FlowBoard):
-            board = FlowBoard(loadboard.size)
-            board.__dict__.update(loadboard.__dict__)
+        board = FlowBoard.parseFile(filepath)
+        if board is not None:
             self.setBoard(board)
 
     def saveBoardFile(self, filepath):
-        pickle.dump(self._board, open(filepath, 'wb'))
+        self._board.saveFile(filepath)
 
     def resizeEvent(self, event):
         super(FlowBoardEditor, self).resizeEvent(event)
