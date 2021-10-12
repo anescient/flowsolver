@@ -91,6 +91,11 @@ class FlowSolver(object):
             return self._aborted
 
         @property
+        def openSize(self):
+            """Return number of unsolved vertices"""
+            return len(self._reducedgraph.vertices)
+
+        @property
         def coverState(self):
             """
                 Return a hashable value unique to the set of open vertices and
@@ -385,25 +390,36 @@ class FlowSolver(object):
 
     class _Memo(object):
         def __init__(self):
-            self._memo = {}
+            self._memosByDepth = {}
             self._inserts = 0
             self._finds = 0
             self._hits = 0
-            self._limit = 20000
+            self._limit = 2000
 
         def insert(self, frame):
             self._inserts += 1
-            if len(self._memo) >= self._limit:
-                self._prune(3 * self._limit // 4)
-            self._memo[frame.coverState] = self._finds
+            memo = self._getMemo(frame)
+            memo[frame.coverState] = self._finds
 
         def find(self, frame):
             self._finds += 1
-            hit = frame.coverState in self._memo
+            memo = self._getMemo(frame)
+            hit = frame.coverState in memo
             if hit:
                 self._hits += 1
-                self._memo[frame.coverState] = self._finds
+                memo[frame.coverState] = self._finds
             return hit
+
+        def _getMemo(self, frame):
+            d = frame.openSize
+            memo = self._memosByDepth.setdefault(d, {})
+            if len(memo) > self._limit:
+                keep = islice(
+                    sorted(memo, key=memo.get, reverse=True),
+                    3 * self._limit // 4)
+                memo = dict((k, memo[k]) for k in keep)
+                self._memosByDepth[d] = memo
+            return memo
 
         def stats(self):
             stats = "{0} inserts".format(self._inserts)
@@ -412,11 +428,6 @@ class FlowSolver(object):
                     self._hits / float(self._finds),
                     self._hits / float(self._inserts))
             return stats
-
-        def _prune(self, limit):
-            keep = islice(
-                sorted(self._memo, key=self._memo.get, reverse=True), limit)
-            self._memo = dict((k, self._memo[k]) for k in keep)
 
     def __init__(self, puzzle):
         self._stack = [self._Frame.initial(puzzle)]
