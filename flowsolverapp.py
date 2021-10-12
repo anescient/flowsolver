@@ -180,9 +180,34 @@ class FlowSolvingPopup(QDialog):
         self._solverWidget.repaint()
 
 
-if __name__ == '__main__':
-    import sys
-    app = QApplication(sys.argv)
+def _app(argv):
+    app = QApplication(argv)
     main = FlowSolverAppWindow()
     main.show()
-    sys.exit(app.exec_())
+    return app.exec_()
+
+
+def _benchmark(boardfile):
+    print("\n" + boardfile)
+    board = FlowBoard.parseFile(boardfile)
+    if board is None:
+        return
+    from flowsolver import FlowSolver
+    from psutil import Process
+    this = Process()
+    solver = FlowSolver(board.getPuzzle()[0])
+    cputime = this.cpu_times().user
+    solver.run()
+    cputime = this.cpu_times().user - cputime
+    print("{:.2f} seconds".format(cputime))
+    solver.printStats()
+
+
+if __name__ == '__main__':
+    import sys
+    argv = sys.argv
+    if len(argv) >= 3 and argv[1] == '-b':
+        for arg in argv[2:]:
+            _benchmark(arg)
+    else:
+        sys.exit(_app(argv))

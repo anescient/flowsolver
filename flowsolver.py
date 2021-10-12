@@ -433,6 +433,10 @@ class FlowSolver(object):
     def solved(self):
         return bool(self._stack and self._stack[-1].isSolved())
 
+    @property
+    def statesVisited(self):
+        return self._totalframes
+
     def stateHash(self):
         return hash(self._immutableFlows())
 
@@ -464,6 +468,7 @@ class FlowSolver(object):
         return True
 
     def run(self, limit=None):
+        """limit is number of backtracks, not frames"""
         if self.done:
             return True
         while self._stack:
@@ -487,10 +492,10 @@ class FlowSolver(object):
         self._memo = self._Memo()
 
     def printStats(self):
-        print("{0} visited".format(self._totalframes))
+        print("{0} visited".format(self.statesVisited))
         print("memo: " + self._memo.stats())
         if self.solved:
-            print("solution" + hex(abs(self.stateHash())))
+            print("solution " + hex(abs(self.stateHash())))
 
     def getFlows(self):
         return self._Frame.recoverPaths(self._stack)
