@@ -280,6 +280,9 @@ class FlowSolver(object):
                 self._nextframes = \
                     deque(self.copy(m) for m in self._bestMoves())
 
+        def _resolveVidx(self, vidx):
+            return self._headpairs[vidx // 2][1 - vidx % 2]
+
         def _bestMoves(self):
             movesets = self._possibleMoves()
             if not movesets:
@@ -301,9 +304,19 @@ class FlowSolver(object):
                 focusmovesets = [ms for ms in movesets if ms[1] & focus]
                 movesets = focusmovesets or movesets
 
-            vidx, moves = min(movesets, key=lambda ms: len(ms[1]))
-            target = self._headpairs[vidx // 2][1 - vidx % 2]
-            moves = self._reducedgraph.sortClosest(moves, target)
+            # consider only endpoints with minimum possible moves
+            movesets = sorted(movesets, key=lambda ms: len(ms[1]))
+            while len(movesets[0][1]) != len(movesets[-1][1]):
+                movesets.pop()
+
+            eccs = {}
+            for vidx, _ in movesets:
+                v = self._resolveVidx(vidx)
+                eccs[v] = self._reducedgraph.hyperEccentricity(v)
+            vidx, moves = max(movesets, key=lambda m: eccs[self._resolveVidx(m[0])])
+            for v in moves:
+                eccs[v] = self._reducedgraph.hyperEccentricity(v)
+            moves = sorted(moves, key=lambda v: eccs[v], reverse=True)
             return ((vidx, to) for to in moves)
 
         def _possibleMoves(self):

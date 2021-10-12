@@ -78,6 +78,26 @@ class QueryableSimpleGraph(object):
                 rounds += 1
         return rounds
 
+    def hyperEccentricity(self, v, mask=None):
+        """
+            Return sum of distances from v to all connected.
+            mask: use only these vertices and their incident edges
+        """
+        vertices = self._maskVertices(mask)
+        visited = set()
+        front = {v}
+        rounds = 0
+        score = 0
+        while front:
+            score += rounds * len(front)
+            nextfront = reduce(set.union, (self._edges[v] for v in front))
+            assert isinstance(nextfront, set)
+            visited |= front
+            front = (nextfront & vertices) - visited
+            if front:
+                rounds += 1
+        return score
+
     def sortClosest(self, vertices, target, mask=None):
         """
             Return 'vertices' ordered by increasing distance from 'target'.

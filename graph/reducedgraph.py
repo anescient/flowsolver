@@ -214,6 +214,18 @@ class OnlineReducedGraph(object):
         mask = reduce(set.union, map(self._components.get, kset))
         return self._graph.adjacencies(v, mask)
 
+    def eccentricity(self, v, omit=None):
+        verts = self._vertices
+        if omit:
+            verts = self._vertices - omit
+        return self._graph.eccentricity(v, verts)
+
+    def hyperEccentricity(self, v, omit=None):
+        verts = self._vertices
+        if omit:
+            verts = self._vertices - omit
+        return self._graph.hyperEccentricity(v, verts)
+
     def sortClosest(self, vertices, target):
         return self._graph.sortClosest(vertices, target, self._vertices)
 
