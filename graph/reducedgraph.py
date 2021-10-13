@@ -226,6 +226,9 @@ class OnlineReducedGraph(object):
             verts = self._vertices - omit
         return self._graph.hyperEccentricity(v, verts)
 
+    def hyperDistance(self, v, targets):
+        return self._graph.hyperDistance(v, targets, self._vertices)
+
     def sortClosest(self, vertices, target):
         return self._graph.sortClosest(vertices, target, self._vertices)
 

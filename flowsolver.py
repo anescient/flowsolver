@@ -294,9 +294,8 @@ class FlowSolver(object):
                 if len(moves) == 1:
                     return ((vidx, to) for to in moves)
 
+            # focus on moving into the smallest biconnected component
             # not sure why this helps as much as it does
-            # maybe by increasing chance of memo hit?
-            # re-evaluate this if memoization is significantly changed
             bcs, _ = self._reducedgraph.biconnectedComponents()
             if len(bcs) > 1:
                 focus = min(bcs, key=len)

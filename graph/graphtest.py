@@ -385,11 +385,18 @@ def _testEccentricity():
     for v in g.vertices:
         if g.degree(v) == 2:
             assert g.eccentricity(v) == 6
+            assert g.hyperEccentricity(v) == 48
         elif g.degree(v) == 4:
             assert g.eccentricity(v) == 4
+            assert g.hyperEccentricity(v) == 32
         else:
             assert g.degree(v) == 3
             assert g.eccentricity(v) == 5
+            assert g.hyperEccentricity(v) == 40
+        assert g.hyperDistance(v, g.vertices) ==\
+               g.hyperEccentricity(v)
+        assert g.hyperDistance(v, []) == 0
+    assert g.hyperDistance(0, [3, 4, 9]) == 7
     v_a = g.pushVertex()
     assert g.eccentricity(v_a) == 0
     v_b = g.pushVertex()
@@ -399,10 +406,16 @@ def _testEccentricity():
     assert g.eccentricity(v_a) == 6
     assert g.eccentricity(v_b) == g.eccentricity(v_a) + 1
     assert g.eccentricity(12) == 7
+    assert g.hyperEccentricity(v_b) == 73
+    assert g.hyperDistance(v_b, [7, 11, 15]) == 9
     g.addEdge(v_b, 15)
+    assert g.hyperDistance(v_b, [7, 11, 15]) == 5
     assert g.eccentricity(12) == 6
+    assert g.hyperEccentricity(v_b) == 57
     mask = set(g.vertices) - {13, 9}
     assert g.eccentricity(12, mask) == 7
+    assert g.hyperDistance(12, g.vertices, mask) ==\
+           g.hyperEccentricity(12, mask)
     g.removeEdge(v_a, 7)
     assert g.eccentricity(12, mask) == 9
 

@@ -86,17 +86,39 @@ class QueryableSimpleGraph(object):
         vertices = self._maskVertices(mask)
         visited = set()
         front = {v}
-        rounds = 0
-        score = 0
+        rounds = -1
+        distanceSum = 0
         while front:
-            score += rounds * len(front)
+            rounds += 1
+            distanceSum += rounds * len(front)
             nextfront = reduce(set.union, (self._edges[v] for v in front))
             assert isinstance(nextfront, set)
             visited |= front
             front = (nextfront & vertices) - visited
-            if front:
-                rounds += 1
-        return score
+        return distanceSum
+
+    def hyperDistance(self, v, targets, mask=None):
+        """
+            Return sum of distances from v to all reachable targets.
+            mask: use only these vertices and their incident edges
+        """
+        vertices = self._maskVertices(mask)
+        visited = set()
+        front = {v}
+        rounds = -1
+        distanceSum = 0
+        targets = set(targets)
+        while front and targets:
+            rounds += 1
+            hits = len(front & targets)
+            if hits > 0:
+                distanceSum += rounds * hits
+                targets -= front
+            nextfront = reduce(set.union, (self._edges[v] for v in front))
+            assert isinstance(nextfront, set)
+            visited |= front
+            front = (nextfront & vertices) - visited
+        return distanceSum
 
     def sortClosest(self, vertices, target, mask=None):
         """
