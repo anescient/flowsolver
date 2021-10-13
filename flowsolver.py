@@ -515,11 +515,20 @@ class FlowSolver(object):
             pass
         self._memo = self._Memo()
 
+    def _stateFingerprint(self):
+        digits = '2345679abcdefghknpqrtuwxyzABFGHLNQR'
+        hash = abs(self.stateHash())
+        result = ''
+        while hash:
+            result += digits[hash % len(digits)]
+            hash //= len(digits)
+        return result
+
     def printStats(self):
         print("{0} visited".format(self.statesVisited))
         print("memo: " + self._memo.stats())
         if self.solved:
-            print("solution " + hex(abs(self.stateHash())))
+            print("solution " + self._stateFingerprint())
 
     def getFlows(self):
         return self._Frame.recoverPaths(self._stack)
