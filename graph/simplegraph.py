@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 
+import copy
 from collections import deque
 from functools import reduce
 
 
 # noinspection PyPep8Naming
+from graph.tree import Forest
+
+
 class QueryableSimpleGraph(object):
     def __init__(self, edgeSets):
         self._edges = edgeSets
@@ -23,6 +27,16 @@ class QueryableSimpleGraph(object):
     def vertices(self):
         return iter(self._edges)
 
+    @property
+    def vertexCount(self):
+        return len(self._edges)
+
+    @property
+    def isolatedVertices(self):
+        for v, edges in self._edges.items():
+            if not edges:
+                yield v
+
     def edgeCount(self, mask=None, *, without=None):
         """
             Return number of adjacent vertex pairs.
@@ -38,6 +52,15 @@ class QueryableSimpleGraph(object):
         for v in vertices:
             halfEdges += len(self._edges[v].intersection(vertices))
         return halfEdges // 2
+
+    @property
+    def edges(self):
+        """Return a set of ordered 2-tuples of vertices, one per edge."""
+        edgeset = set()
+        for v1, adjacencies in self._edges.items():
+            for v2 in adjacencies:
+                edgeset.add((v1, v2) if v1 < v2 else (v2, v1))
+        return edgeset
 
     def copyEdgeSets(self):
         return {v: adj.copy() for v, adj in self._edges.items()}
@@ -55,6 +78,10 @@ class QueryableSimpleGraph(object):
             return self._edges[v].copy()
         else:
             return self._edges[v].intersection(mask)
+
+    def singleAdjacency(self, v):
+        assert len(self._edges[v]) == 1
+        return next(iter(self._edges[v]))
 
     def degree(self, v):
         """Return number of vertices adjacent to v."""
@@ -255,6 +282,18 @@ class QueryableSimpleGraph(object):
         mask.discard(v)
         return not self.isConnectedSet(links, mask)
 
+    def isCycle(self, p):
+        """
+            p is a sequence of distinct vertices.
+            Return True if there are edges (p[i], p[i+1]) and (p[0], p[-1]).
+        """
+        assert len(p) > 1
+        assert len(p) == len(set(p))
+        for v1, v2 in zip(p[:-1], p[1:]):
+            if v1 not in self._edges[v2]:
+                return False
+        return p[0] in self._edges[p[-1]]
+
     def biconnectedComponents(self, mask=None):
         """
             Return tuple(list(sets), set) containing the sets of vertices
@@ -344,6 +383,30 @@ class QueryableSimpleGraph(object):
             partitions.append(p)
         return partitions
 
+    def isMatching(self):
+        return all(len(connected) <= 1 for _, connected in self._edges.items())
+
+    def isPerfectMatching(self):
+        return self.vertexCount % 2 == 0 and\
+               self.edgeCount() == self.vertexCount // 2 and\
+               self.isMatching()
+
+    def maximumMatching(self):
+        """Return a graph which is a maximum matching in this."""
+        matching = SimpleGraph()
+        matching.addVertices(self.vertices)
+        while True:
+            ap = _findAugmentingPath(self, matching)
+            if not ap:
+                break
+            # assert len(ap) % 2 == 0
+            # augment matching with alternating path
+            for v1, v2 in zip(ap[::2], ap[1::2]):
+                matching.removeAnyEdges(v1)
+                matching.removeAnyEdges(v2)
+                matching.addEdge(v1, v2)
+        return matching
+
     def _maskVertices(self, mask=None):
         """
             Return a new set containing the graph's vertices.
@@ -369,6 +432,10 @@ class SimpleGraph(QueryableSimpleGraph):
         self.addVertex(v)
         return v
 
+    def pushVertices(self, n):
+        """Return n new vertex ids."""
+        return [self.pushVertex() for _ in range(n)]
+
     def addVertex(self, v):
         """Add a vertex with id v."""
         if v in self._edges:
@@ -391,6 +458,26 @@ class SimpleGraph(QueryableSimpleGraph):
         for v in verts:
             self.removeVertex(v)
 
+    def contractVertices(self, verts, cv=None):
+        """
+            verts is a collection of vertices.
+            Contract all vertices in verts into a new vertex and return it.
+            If cv is given, use cv for the new vertex id.
+        """
+        assert len(verts) > 1
+        if cv is None:
+            cv = self.pushVertex()
+        else:
+            self.addVertex(cv)
+        connected = set()
+        for v in verts:
+            connected |= self._edges[v]
+            self.removeVertex(v)
+        connected -= set(verts)
+        for v in connected:
+            self.addEdge(cv, v)
+        return cv
+
     def addEdge(self, v1, v2):
         """Connect v1 and v2. Error if loop or already connected."""
         assert v1 != v2
@@ -403,3 +490,83 @@ class SimpleGraph(QueryableSimpleGraph):
         assert v1 != v2
         self._edges[v1].remove(v2)
         self._edges[v2].remove(v1)
+
+    def removeAnyEdges(self, v):
+        """Delete any/all edges incident to v."""
+        for adj in self._edges[v]:
+            self._edges[adj].remove(v)
+        self._edges[v].clear()
+
+
+def _findAugmentingPath(G, M):
+    unmarkedVerts = set(G.vertices)
+    unmarkedEdges = G.edges - M.edges
+    forest = Forest()
+    for v in M.isolatedVertices:
+        forest.addTree(v)
+    while True:
+        v = None
+        for _v in unmarkedVerts:
+            if _v in forest and forest.depthOf(_v) % 2 == 0:
+                v = _v
+                break
+        if v is None:
+            break
+
+        while True:
+            e = None
+            for _e in unmarkedEdges:
+                if v in _e:
+                    e = _e
+                    break
+            if e is None:
+                break
+
+            w = e[1] if e[0] == v else e[0]
+            if w not in forest:
+                x = M.singleAdjacency(w)
+                forest.add(w, v)
+                forest.add(x, w)
+            else:
+                if forest.depthOf(w) % 2 == 0:
+                    if forest.rootFor(v) != forest.rootFor(w):
+                        p = forest.pathToRoot(v)
+                        p.reverse()
+                        p.extend(forest.pathToRoot(w))
+                        # assert len(p) % 2 == 0
+                        return p
+                    else:
+                        B = forest.findPath(v, w)
+                        # assert len(B) % 2 == 1
+                        # assert G.isCycle(B)
+                        Gc = copy.deepcopy(G)
+                        vb = Gc.contractVertices(B)
+                        Mc = copy.deepcopy(M)
+                        Mc.contractVertices(B, vb)
+                        p = _findAugmentingPath(Gc, Mc)
+                        if vb in p:
+                            p_in = p[:p.index(vb)]
+                            p_out = p[p.index(vb) + 1:]
+                            if not p_out:
+                                # p[-1] was vb, make like p[0] was vb
+                                p_out = p_in
+                                p_out.reverse()
+                                p_in = []
+                            if p_in:
+                                for i, B_v in enumerate(B):
+                                    if G.adjacent(B_v, p_in[-1]):
+                                        B = B[i:] + B[:i]
+                                        break
+                            B_r = B[:1] + list(reversed(B[1:]))
+                            while len(B) > 2 and not G.adjacent(p_out[0], B[-1]):
+                                B = B[:-2]
+                            while len(B_r) > 2 and not G.adjacent(p_out[0], B_r[-1]):
+                                B_r = B_r[:-2]
+                            if len(B_r) > len(B):
+                                B = B_r
+                            p = p_in + B + p_out
+                        # assert len(p) % 2 == 0
+                        return p
+            unmarkedEdges.remove(e)
+        unmarkedVerts.remove(v)
+    return []

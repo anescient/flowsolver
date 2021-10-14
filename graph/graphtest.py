@@ -5,6 +5,7 @@ from copy import deepcopy
 from itertools import combinations
 from functools import reduce
 from graph import SimpleGraph, QueryableSimpleGraph, OnlineReducedGraph
+from graph.tree import Tree
 
 
 def _testGraph():
@@ -314,6 +315,20 @@ def _build4by4():
     return g
 
 
+def _makeChain(g, length):
+    assert length > 1
+    verts = g.pushVertices(length)
+    for a, b in zip(verts, verts[1:]):
+        g.addEdge(a, b)
+    return verts
+
+
+def _makeLoop(g, length):
+    verts = _makeChain(g, length)
+    g.addEdge(verts[-1], verts[0])
+    return verts
+
+
 def _testSortClosest():
     g = _build4by4()
     assert g.sortClosest([], 0) == []
@@ -420,12 +435,92 @@ def _testEccentricity():
     assert g.eccentricity(12, mask) == 9
 
 
+def _testTree():
+    t = Tree(1)
+    assert t.root == 1
+    assert 1 in t
+    assert t.depthOf(1) == 0
+    assert t.parent(1) is None
+    assert t.findPath(1, 1) == [1]
+    t.add(2, 1)
+    assert t.depthOf(2) == 1
+    assert t.parent(2) == 1
+    t.add(3, 1)
+    assert t.findPath(2, 3) == [2, 1, 3]
+    t.add(4, 2)
+    t.add(5, 3)
+    assert t.findPath(4, 5) == [4, 2, 1, 3, 5]
+    assert t.findPath(2, 5) == [2, 1, 3, 5]
+    assert t.findPath(4, 3) == [4, 2, 1, 3]
+    t.add(6, 2)
+    t.add(7, 2)
+    t.add(9, 7)
+    assert t.findPath(6, 3) == [6, 2, 1, 3]
+    assert t.findPath(6, 9) == [6, 2, 7, 9]
+
+
+def _testMatching():
+    g = SimpleGraph()
+    verts = list(range(7))
+    g.addVertices(verts)
+    assert g.isMatching()
+    g.addEdge(0, 1)
+    assert g.isMatching()
+    g.addEdge(1, 2)
+    assert not g.isMatching()
+    g.addEdge(2, 3)
+    g.addEdge(4, 5)
+    assert not g.isMatching()
+    g.removeEdge(1, 2)
+    assert g.isMatching()
+    assert not g.isPerfectMatching()
+    g.addEdge(6, g.pushVertex())
+    assert g.isPerfectMatching()
+
+    g = _build4by4()
+    assert not g.isMatching()
+    assert g.maximumMatching().isPerfectMatching()
+    v_a = g.pushVertex()
+    g.addEdge(0, v_a)
+    m = g.maximumMatching()
+    assert m.isMatching()
+    assert not m.isPerfectMatching()
+    v_b = g.pushVertex()
+    g.addEdge(v_a, v_b)
+    assert g.maximumMatching().isPerfectMatching()
+    g.addEdge(v_b, 4)
+    assert g.maximumMatching().isPerfectMatching()
+
+    g = SimpleGraph()
+    A = _makeChain(g, 9)
+    assert not g.isCycle(A)
+    assert g.maximumMatching().edgeCount() == 4
+    g.addEdge(A[0], A[-1])
+    assert g.isCycle(A)
+    assert g.maximumMatching().edgeCount() == 4
+    hub = g.pushVertex()
+    for Av in A:
+        g.addEdge(hub, Av)
+    assert g.maximumMatching().isPerfectMatching()
+    for Av in A:
+        g.addEdge(Av, _makeLoop(g, 5)[0])
+    assert not g.maximumMatching().isPerfectMatching()
+    g.removeVertex(hub)
+    assert g.maximumMatching().isPerfectMatching()
+
+    g = _build4by4()
+    g.removeVertices([4, 8, 3, 15])
+    assert g.maximumMatching().isPerfectMatching()
+
+
 if __name__ == '__main__':
+    _testMatching()
     _testGraph()
     _testReducedGraph()
     _testGraphBiconnected()
     _testSortClosest()
     _testShortestPath()
     _testEccentricity()
+    _testTree()
     print("Tests passed.")
     exit(0)
